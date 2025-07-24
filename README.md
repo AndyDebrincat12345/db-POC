@@ -137,6 +137,7 @@ It is provided **as-is** for demonstration and educational purposes.
 
 **This code and all related materials may not be copied, reused, or redistributed without prior written permission from EY.**
 
+For full license details, please refer to the [LICENSE](LICENSE) file.
 ---
 
 ## Contact
