@@ -6,7 +6,7 @@
     http://www.liquibase.org/xml/ns/dbchangelog
     https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
 
-  <include file="liquibase/changelog/001-create-service-status-table.xml" />
-  <include file="liquibase/changelog/001-create-table-user.xml" />
+  <include file="001-create-service-status-table.xml" />
+  <include file="002-create-table-user.xml" />
 
 </databaseChangeLog>

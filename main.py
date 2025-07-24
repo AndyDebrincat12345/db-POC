@@ -1,6 +1,7 @@
 import os
 import mysql.connector
 from dotenv import load_dotenv
+import subprocess
 
 load_dotenv()
 
@@ -25,6 +26,22 @@ def run_sql_file(cursor, filepath):
     statements = [stmt.strip() for stmt in sql.split(";") if stmt.strip()]
     for statement in statements:
         cursor.execute(statement)
+
+def run_liquibase_migrations():
+    print("Running Liquibase migrations (via CLI)...")
+
+    liquibase_executable = r"C:\Program Files\liquibase\liquibase.bat"  # adjust as needed
+
+    subprocess.run(
+        [
+            liquibase_executable,
+            "--defaultsFile=liquibase.properties",
+            "update"
+        ],
+        cwd="liquibase",
+        check=True
+    )
+
 
 def run_migration_folder(cursor, folder_path):
     files = sorted([f for f in os.listdir(folder_path) if f.endswith(".sql")])
@@ -105,7 +122,6 @@ def insert_email(cursor, conn):
         print("✔️ Email inserted successfully.\n")
     except mysql.connector.Error as err:
         print(f"❌ Error inserting email: {err}\n")
-
 def migrations_menu(cursor, conn):
     while True:
         print("\n--- Migrations Menu ---")
@@ -115,8 +131,7 @@ def migrations_menu(cursor, conn):
         print("4. Back")
         choice = input("Select an option (1-4): ").strip()
         if choice == "1":
-            run_migration_folder(cursor, os.path.join("liquibase", "changelog"))
-            conn.commit()
+            run_liquibase_migrations()
         elif choice == "2":
             run_migration_folder(cursor, os.path.join("redgate", "migrations"))
             conn.commit()

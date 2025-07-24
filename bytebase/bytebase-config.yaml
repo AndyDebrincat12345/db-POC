@@ -1,7 +1,11 @@
-migrations_dir: ./migrations
+name: bytebase-poc
+environment: local
 database:
-  host: ${DB_HOST}
-  port: ${DB_PORT}
-  user: ${DB_USER}
-  password: ${DB_PASS}
-  dbname: ${DB_NAME}
+  type: mysql
+  host: localhost
+  port: 3306
+  username: root
+  database: poc_db
+migrations:
+  folder: migrations
+  order: filename
