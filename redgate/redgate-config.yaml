@@ -1,0 +1,15 @@
+database:
+  host: ${DB_HOST}
+  port: ${DB_PORT}
+  user: ${DB_USER}
+  password: ${DB_PASS}
+  name: ${DB_NAME}
+
+migrations:
+  folder: ./migrations
+  file_extension: .sql
+
+metadata:
+  tool: Redgate
+  version: "1.0"
+  description: "Redgate migration config for POC"
