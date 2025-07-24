@@ -37,6 +37,26 @@ def run_liquibase():
     except Exception as e:
         messagebox.showerror("Error", str(e))
 
+# Run folder-based SQL migrations
+
+def run_sql_folder(folder_path):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        files = sorted([f for f in os.listdir(folder_path) if f.endswith(".sql")])
+        for filename in files:
+            filepath = os.path.join(folder_path, filename)
+            with open(filepath, "r") as f:
+                sql = f.read()
+            statements = [stmt.strip() for stmt in sql.split(";") if stmt.strip()]
+            for stmt in statements:
+                cursor.execute(stmt)
+        conn.commit()
+        conn.close()
+        messagebox.showinfo("Success", f"Migrations from {folder_path} completed.")
+    except Exception as e:
+        messagebox.showerror("Error", str(e))
+
 # Reset DB
 
 def reset_database():
@@ -121,6 +141,8 @@ def create_gui():
     # --- Migrations Tab ---
     tab_migrations = ttk.Frame(notebook)
     ttk.Button(tab_migrations, text="Run Liquibase Migration", command=run_liquibase).pack(pady=10)
+    ttk.Button(tab_migrations, text="Run Redgate Migration", command=lambda: run_sql_folder("redgate/migrations")).pack(pady=10)
+    ttk.Button(tab_migrations, text="Run Bytebase Migration", command=lambda: run_sql_folder("bytebase/migrations")).pack(pady=10)
     notebook.add(tab_migrations, text="Migrations")
 
     # --- View Data Tab ---
