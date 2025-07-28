@@ -45,6 +45,21 @@ class ProfessionalMigrationGUI:
         self.setup_main_window()
         self.create_interface()
     
+    def add_mousewheel_support(self, canvas):
+        """Add mouse wheel scrolling support to a canvas"""
+        def on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        
+        def bind_mousewheel(event):
+            canvas.bind_all("<MouseWheel>", on_mousewheel)
+        
+        def unbind_mousewheel(event):
+            canvas.unbind_all("<MouseWheel>")
+        
+        # Bind mouse wheel events when entering/leaving the canvas
+        canvas.bind('<Enter>', bind_mousewheel)
+        canvas.bind('<Leave>', unbind_mousewheel)
+    
     def setup_styles(self):
         """Configure professional styling"""
         style = ttk.Style()
@@ -225,6 +240,9 @@ class ProfessionalMigrationGUI:
         canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
         
+        # Add mouse wheel scrolling support
+        self.add_mousewheel_support(canvas)
+        
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
         
@@ -336,6 +354,18 @@ class ProfessionalMigrationGUI:
                                 style='Heading.TLabel')
         header_label.pack(pady=20)
         
+        # Console controls - at the top, always visible
+        controls_frame = ttk.Frame(tab_frame, style='Professional.TFrame')
+        controls_frame.pack(fill='x', padx=20, pady=(0, 10))
+        
+        ttk.Button(controls_frame, text="Clear Console",
+                  style='Danger.TButton',
+                  command=self.clear_console).pack(side='left', padx=(0, 10))
+        
+        ttk.Button(controls_frame, text="Save Log",
+                  style='Professional.TButton',
+                  command=self.save_log).pack(side='left', padx=10)
+        
         # Results area
         results_frame = ttk.Frame(tab_frame, style='Professional.TFrame')
         results_frame.pack(fill='both', expand=True, padx=20, pady=10)
@@ -348,17 +378,18 @@ class ProfessionalMigrationGUI:
                                                      insertbackground=self.colors['accent'])
         self.results_text.pack(fill='both', expand=True)
         
-        # Console controls
-        controls_frame = ttk.Frame(tab_frame, style='Professional.TFrame')
-        controls_frame.pack(fill='x', padx=20, pady=10)
+        # Add mouse wheel scrolling support to console
+        def on_console_mousewheel(event):
+            self.results_text.yview_scroll(int(-1*(event.delta/120)), "units")
         
-        ttk.Button(controls_frame, text="Clear Console",
-                  style='Danger.TButton',
-                  command=self.clear_console).pack(side='left', padx=(0, 10))
+        def bind_console_mousewheel(event):
+            self.results_text.bind_all("<MouseWheel>", on_console_mousewheel)
         
-        ttk.Button(controls_frame, text="Save Log",
-                  style='Professional.TButton',
-                  command=self.save_log).pack(side='left', padx=10)
+        def unbind_console_mousewheel(event):
+            self.results_text.unbind_all("<MouseWheel>")
+        
+        self.results_text.bind('<Enter>', bind_console_mousewheel)
+        self.results_text.bind('<Leave>', unbind_console_mousewheel)
         
         # Initial message
         self.results_text.insert('1.0', "Ready to run migration comparisons...\n\n")
@@ -428,6 +459,19 @@ class ProfessionalMigrationGUI:
         h_scrollbar.pack(side='bottom', fill='x')
         self.data_tree.pack(fill='both', expand=True)
         
+        # Add mouse wheel scrolling support to data tree
+        def on_tree_mousewheel(event):
+            self.data_tree.yview_scroll(int(-1*(event.delta/120)), "units")
+        
+        def bind_tree_mousewheel(event):
+            self.data_tree.bind_all("<MouseWheel>", on_tree_mousewheel)
+        
+        def unbind_tree_mousewheel(event):
+            self.data_tree.unbind_all("<MouseWheel>")
+        
+        self.data_tree.bind('<Enter>', bind_tree_mousewheel)
+        self.data_tree.bind('<Leave>', unbind_tree_mousewheel)
+        
         # Initial table refresh
         self.refresh_tables()
     
@@ -442,21 +486,9 @@ class ProfessionalMigrationGUI:
                                 style='Heading.TLabel')
         header_label.pack(pady=20)
         
-        # Analysis content
-        analysis_frame = ttk.Frame(tab_frame, style='Professional.TFrame')
-        analysis_frame.pack(fill='both', expand=True, padx=20, pady=10)
-        
-        # Analysis text area
-        self.analysis_text = scrolledtext.ScrolledText(analysis_frame,
-                                                      bg=self.colors['secondary_bg'],
-                                                      fg=self.colors['text_light'],
-                                                      font=('Segoe UI', 10),
-                                                      insertbackground=self.colors['accent'])
-        self.analysis_text.pack(fill='both', expand=True)
-        
-        # Control buttons
+        # Control buttons - at the top, always visible
         controls_frame = ttk.Frame(tab_frame, style='Professional.TFrame')
-        controls_frame.pack(fill='x', padx=20, pady=10)
+        controls_frame.pack(fill='x', padx=20, pady=(0, 10))
         
         ttk.Button(controls_frame, text="🔍 Schema Analysis",
                   style='Professional.TButton',
@@ -469,6 +501,31 @@ class ProfessionalMigrationGUI:
         ttk.Button(controls_frame, text="📋 Migration Comparison",
                   style='Professional.TButton', 
                   command=self.migration_comparison_report).pack(side='left', padx=10)
+        
+        # Analysis content
+        analysis_frame = ttk.Frame(tab_frame, style='Professional.TFrame')
+        analysis_frame.pack(fill='both', expand=True, padx=20, pady=10)
+        
+        # Analysis text area
+        self.analysis_text = scrolledtext.ScrolledText(analysis_frame,
+                                                      bg=self.colors['secondary_bg'],
+                                                      fg=self.colors['text_light'],
+                                                      font=('Segoe UI', 10),
+                                                      insertbackground=self.colors['accent'])
+        self.analysis_text.pack(fill='both', expand=True)
+        
+        # Add mouse wheel scrolling support to analysis text
+        def on_analysis_mousewheel(event):
+            self.analysis_text.yview_scroll(int(-1*(event.delta/120)), "units")
+        
+        def bind_analysis_mousewheel(event):
+            self.analysis_text.bind_all("<MouseWheel>", on_analysis_mousewheel)
+        
+        def unbind_analysis_mousewheel(event):
+            self.analysis_text.unbind_all("<MouseWheel>")
+        
+        self.analysis_text.bind('<Enter>', bind_analysis_mousewheel)
+        self.analysis_text.bind('<Leave>', unbind_analysis_mousewheel)
         
         # Initial content
         self.analysis_text.insert('1.0', "Database Schema Analysis & Performance Insights\n")
@@ -1007,6 +1064,11 @@ User: {self.db_config['user']}
     
     def log_result(self, message):
         """Log result to console tab"""
+        # Ensure there's a newline before new messages if console has content
+        current_content = self.results_text.get('1.0', 'end-1c')
+        if current_content and not current_content.endswith('\n'):
+            self.results_text.insert('end', '\n')
+        
         self.results_text.insert('end', f"{message}\n")
         self.results_text.see('end')
     
@@ -1187,6 +1249,9 @@ User: {self.db_config['user']}
         
         canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # Add mouse wheel scrolling support
+        self.add_mousewheel_support(canvas)
         
         # Pack canvas with less height to leave room for buttons at bottom
         canvas.pack(side="left", fill="both", expand=True, padx=20)
