@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+
+    <changeSet id="4" author="poc-team">
+        <!-- Create roles table -->
+        <createTable tableName="roles_lq">
+            <column name="id" type="INT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="name" type="VARCHAR(50)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="description" type="TEXT"/>
+            <column name="is_system_role" type="BOOLEAN" defaultValueBoolean="false"/>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
+        </createTable>
+
+        <!-- Create permissions table -->
+        <createTable tableName="permissions_lq">
+            <column name="id" type="INT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="name" type="VARCHAR(100)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="resource" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="action" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="description" type="TEXT"/>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
+        </createTable>
+
+        <!-- Create role_permissions junction table -->
+        <createTable tableName="role_permissions_lq">
+            <column name="role_id" type="INT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="permission_id" type="INT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="granted_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
+            <column name="granted_by" type="INT"/>
+        </createTable>
+
+        <!-- Add primary key constraint -->
+        <addPrimaryKey tableName="role_permissions_lq" columnNames="role_id,permission_id"/>
+
+        <!-- Add foreign key constraints -->
+        <addForeignKeyConstraint
+            baseTableName="role_permissions_lq"
+            baseColumnNames="role_id"
+            referencedTableName="roles_lq"
+            referencedColumnNames="id"
+            constraintName="fk_role_permissions_role"
+            onDelete="CASCADE"/>
+
+        <addForeignKeyConstraint
+            baseTableName="role_permissions_lq"
+            baseColumnNames="permission_id"
+            referencedTableName="permissions_lq"
+            referencedColumnNames="id"
+            constraintName="fk_role_permissions_permission"
+            onDelete="CASCADE"/>
+
+        <addForeignKeyConstraint
+            baseTableName="role_permissions_lq"
+            baseColumnNames="granted_by"
+            referencedTableName="users_comprehensive"
+            referencedColumnNames="id"
+            constraintName="fk_role_permissions_granted_by"
+            onDelete="SET NULL"/>
+
+        <!-- Create indexes -->
+        <createIndex tableName="permissions_lq" indexName="idx_resource_action">
+            <column name="resource"/>
+            <column name="action"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

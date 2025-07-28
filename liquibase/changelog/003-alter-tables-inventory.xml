@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+
+    <changeSet id="5" author="poc-team">
+        <!-- Add columns to service_status table -->
+        <addColumn tableName="service_status">
+            <column name="health_score" type="INT" defaultValue="100"/>
+            <column name="last_check_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
+            <column name="error_message" type="TEXT"/>
+        </addColumn>
+        
+        <!-- Create inventory tracking table -->
+        <createTable tableName="inventory_lq">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="product_id" type="INT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="location_id" type="INT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="quantity" type="INT" defaultValue="0"/>
+            <column name="reserved_quantity" type="INT" defaultValue="0"/>
+            <column name="last_count_at" type="TIMESTAMP"/>
+            <column name="last_movement_at" type="TIMESTAMP"/>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
+            <column name="updated_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
+        </createTable>
+        
+        <!-- Add foreign key constraints -->
+        <addForeignKeyConstraint
+            baseTableName="inventory_lq"
+            baseColumnNames="location_id"
+            referencedTableName="locations"
+            referencedColumnNames="id"
+            constraintName="fk_inventory_location"/>
+            
+        <!-- Create indexes for performance -->
+        <createIndex tableName="inventory_lq" indexName="idx_product_location">
+            <column name="product_id"/>
+            <column name="location_id"/>
+        </createIndex>
+        
+        <createIndex tableName="inventory_lq" indexName="idx_last_movement">
+            <column name="last_movement_at"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="6" author="poc-team">
+        <!-- Create a view using Liquibase -->
+        <createView viewName="low_stock_products">
+            <![CDATA[
+                SELECT 
+                    p.id,
+                    p.name,
+                    p.sku,
+                    SUM(i.quantity) as total_quantity,
+                    p.low_stock_threshold,
+                    CASE 
+                        WHEN SUM(i.quantity) <= p.low_stock_threshold THEN 'CRITICAL'
+                        WHEN SUM(i.quantity) <= (p.low_stock_threshold * 1.5) THEN 'LOW'
+                        ELSE 'OK'
+                    END as stock_status
+                FROM products p
+                LEFT JOIN inventory_lq i ON p.id = i.product_id
+                WHERE p.is_active = TRUE
+                GROUP BY p.id, p.name, p.sku, p.low_stock_threshold
+                HAVING SUM(i.quantity) <= (p.low_stock_threshold * 2)
+            ]]>
+        </createView>
+    </changeSet>
+
+</databaseChangeLog>
