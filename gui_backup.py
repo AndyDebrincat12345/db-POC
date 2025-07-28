@@ -125,8 +125,9 @@ class ProfessionalMigrationGUI:
         # Add window control buttons
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         
-        # Ensure window has proper title bar controls (minimize, maximize, close)
-        self.root.attributes('-topmost', False)  # Make sure window is not always on top
+        # Enable window controls (minimize, maximize, close) - Windows specific
+        if os.name == 'nt':  # Windows
+            self.root.state('normal')  # Ensure window is in normal state
         
         # Center the window
         self.root.update_idletasks()
@@ -139,9 +140,6 @@ class ProfessionalMigrationGUI:
         
         # Enable window controls (minimize, maximize, close)
         self.root.resizable(True, True)
-        
-        # Ensure window has standard decorations (title bar with controls)
-        self.root.overrideredirect(False)
         
         # Make sure window decorations are enabled
         self.root.overrideredirect(False)
@@ -210,7 +208,7 @@ class ProfessionalMigrationGUI:
     def create_migrations_tab(self):
         """Create professional migrations tab"""
         tab_frame = ttk.Frame(self.notebook, style='Professional.TFrame')
-        self.notebook.add(tab_frame, text="Migrations")
+        self.notebook.add(tab_frame, text="🛠️ Migrations")
         
         # Create scrollable frame
         canvas = tk.Canvas(tab_frame, bg=self.colors['primary_bg'], highlightthickness=0)
@@ -328,7 +326,7 @@ class ProfessionalMigrationGUI:
     def create_console_tab(self):
         """Create console/output log tab"""
         tab_frame = ttk.Frame(self.notebook, style='Professional.TFrame')
-        self.notebook.add(tab_frame, text="Console")
+        self.notebook.add(tab_frame, text="� Console")
         
         # Header
         header_label = ttk.Label(tab_frame, 
@@ -369,7 +367,7 @@ class ProfessionalMigrationGUI:
     def create_data_tab(self):
         """Create data viewing tab"""
         tab_frame = ttk.Frame(self.notebook, style='Professional.TFrame')
-        self.notebook.add(tab_frame, text="Data View")
+        self.notebook.add(tab_frame, text="👁️ Data View")
         
         # Header
         header_label = ttk.Label(tab_frame,
@@ -434,7 +432,7 @@ class ProfessionalMigrationGUI:
     def create_analysis_tab(self):
         """Create analysis and insights tab"""
         tab_frame = ttk.Frame(self.notebook, style='Professional.TFrame')
-        self.notebook.add(tab_frame, text="Analysis")
+        self.notebook.add(tab_frame, text="� Analysis")
         
         # Header
         header_label = ttk.Label(tab_frame,
@@ -482,7 +480,7 @@ class ProfessionalMigrationGUI:
     def create_settings_tab(self):
         """Create settings and configuration tab"""
         tab_frame = ttk.Frame(self.notebook, style='Professional.TFrame')
-        self.notebook.add(tab_frame, text="Settings")
+        self.notebook.add(tab_frame, text="⚙️ Settings")
         
         # Header
         header_label = ttk.Label(tab_frame,
@@ -1152,18 +1150,16 @@ User: {self.db_config['user']}
         """Create dialog for adding/editing rows"""
         dialog = tk.Toplevel(self.root)
         dialog.title(f"{mode} Row - {table_name}")
-        dialog.geometry("450x700")  # Made wider and taller
+        dialog.geometry("400x600")
         dialog.configure(bg=self.colors['primary_bg'])
         dialog.transient(self.root)
         dialog.grab_set()
         
         # Center dialog
         dialog.update_idletasks()
-        x = (dialog.winfo_screenwidth() // 2) - (450 // 2)
-        y = (dialog.winfo_screenheight() // 2) - (700 // 2)
-        dialog.geometry(f"450x700+{x}+{y}")
-        
-        print(f"Creating dialog for {mode} in table {table_name}")  # Debug output
+        x = (dialog.winfo_screenwidth() // 2) - (400 // 2)
+        y = (dialog.winfo_screenheight() // 2) - (600 // 2)
+        dialog.geometry(f"400x600+{x}+{y}")
         
         # Header
         header_label = tk.Label(dialog, text=f"{mode} Row in {table_name}",
@@ -1171,13 +1167,9 @@ User: {self.db_config['user']}
                                font=('Segoe UI', 14, 'bold'))
         header_label.pack(pady=20)
         
-        # Main content frame (for scrollable area)
-        content_frame = tk.Frame(dialog, bg=self.colors['primary_bg'])
-        content_frame.pack(fill='both', expand=True, padx=0, pady=(0, 10))
-        
-        # Scrollable frame for fields (reduced height to make room for buttons)
-        canvas = tk.Canvas(content_frame, bg=self.colors['primary_bg'], highlightthickness=0)
-        scrollbar = ttk.Scrollbar(content_frame, orient="vertical", command=canvas.yview)
+        # Scrollable frame for fields
+        canvas = tk.Canvas(dialog, bg=self.colors['primary_bg'], highlightthickness=0)
+        scrollbar = ttk.Scrollbar(dialog, orient="vertical", command=canvas.yview)
         scrollable_frame = tk.Frame(canvas, bg=self.colors['primary_bg'])
         
         scrollable_frame.bind(
@@ -1188,7 +1180,6 @@ User: {self.db_config['user']}
         canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
         
-        # Pack canvas with less height to leave room for buttons at bottom
         canvas.pack(side="left", fill="both", expand=True, padx=20)
         scrollbar.pack(side="right", fill="y")
         
@@ -1230,35 +1221,14 @@ User: {self.db_config['user']}
             
             entries[col_name] = entry
         
-        # Fixed buttons at the bottom of the dialog (outside scrollable area)
-        # Separator line
-        separator = tk.Frame(dialog, height=2, bg=self.colors['border'])
-        separator.pack(fill='x', padx=20, pady=(10, 0))
-        
-        # Buttons frame fixed at bottom - always visible, never scrolls
-        button_frame = tk.Frame(dialog, bg='white', height=120)  # Fixed at bottom
-        button_frame.pack(fill='x', pady=(10, 20), padx=20, side='bottom')
-        button_frame.pack_propagate(False)  # Maintain fixed height
+        # Buttons
+        button_frame = tk.Frame(dialog, bg=self.colors['primary_bg'])
+        button_frame.pack(fill='x', pady=20, padx=20)
         
         def save_row():
-            print(f"Save button clicked for {mode} in {table_name}")  # Debug output
             try:
-                # Check if at least one field has data
-                has_data = False
-                for col_name, entry in entries.items():
-                    if entry.get().strip():
-                        has_data = True
-                        break
-                
-                if not has_data:
-                    print("No data entered, showing warning")  # Debug
-                    messagebox.showwarning("Warning", "Please enter at least one field value")
-                    return
-                
-                print("Data validation passed, proceeding with database operation")  # Debug
                 conn = self.get_connection()
                 if not conn:
-                    print("Database connection failed")  # Debug
                     return
                 
                 cursor = conn.cursor()
@@ -1278,7 +1248,6 @@ User: {self.db_config['user']}
                     placeholders = ", ".join(["%s"] * len(field_values))
                     sql = f"INSERT INTO {table_name} ({', '.join(field_names)}) VALUES ({placeholders})"
                     cursor.execute(sql, field_values)
-                    success_msg = f"Row added to {table_name} successfully!"
                 else:
                     # UPDATE - assuming first column is primary key
                     if current_values:
@@ -1288,7 +1257,6 @@ User: {self.db_config['user']}
                         set_clause = ", ".join([f"{name} = %s" for name in field_names])
                         sql = f"UPDATE {table_name} SET {set_clause} WHERE {pk_column} = %s"
                         cursor.execute(sql, field_values + [pk_value])
-                        success_msg = f"Row updated in {table_name} successfully!"
                 
                 conn.commit()
                 cursor.close()
@@ -1296,38 +1264,19 @@ User: {self.db_config['user']}
                 
                 self.update_status(f"Row {mode.lower()}ed in {table_name}")
                 self.load_table_data()  # Refresh data
-                messagebox.showinfo("Success", success_msg)
                 dialog.destroy()
                 
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to {mode.lower()} row: {str(e)}")
         
-        # Create highly visible buttons fixed at the bottom - always visible
-        save_button = tk.Button(button_frame, text=f"✅ {mode} Row",
-                              bg='#00FF00', fg='black',  # Bright green background
-                              font=('Segoe UI', 12, 'bold'), 
-                              command=save_row,
-                              width=20, height=2,
-                              relief='raised', bd=3,
-                              cursor='hand2',
-                              activebackground='#32CD32',
-                              activeforeground='black')
-        save_button.pack(side='left', padx=(10, 5), pady=10, fill='both', expand=True)
+        tk.Button(button_frame, text=f"{mode} Row",
+                 bg=self.colors['accent'], fg=self.colors['text_dark'],
+                 font=('Segoe UI', 10, 'bold'), command=save_row).pack(side='left')
         
-        cancel_button = tk.Button(button_frame, text="❌ Cancel",
-                                bg='#FF4500', fg='white',  # Bright red/orange background
-                                font=('Segoe UI', 12, 'bold'),
-                                command=dialog.destroy,
-                                width=20, height=2,
-                                relief='raised', bd=3,
-                                cursor='hand2',
-                                activebackground='#FF6347',
-                                activeforeground='white')
-        cancel_button.pack(side='right', padx=(5, 10), pady=10, fill='both', expand=True)
-        
-        print(f"Buttons created and packed for {mode} dialog")  # Debug output
-        print(f"Save button: {save_button}")  # Debug
-        print(f"Cancel button: {cancel_button}")  # Debug
+        tk.Button(button_frame, text="Cancel",
+                 bg=self.colors['secondary_bg'], fg=self.colors['text_light'],
+                 font=('Segoe UI', 10, 'bold'),
+                 command=dialog.destroy).pack(side='right')
     
     def migration_comparison_report(self):
         """Generate migration comparison report"""
