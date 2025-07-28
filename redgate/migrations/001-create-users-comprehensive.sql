@@ -21,10 +21,9 @@ CREATE TABLE IF NOT EXISTS users_redgate (
 );
 
 -- Create indexes separately for better readability and control
-CREATE INDEX IF NOT EXISTS idx_users_redgate_username ON users_redgate(username);
-CREATE INDEX IF NOT EXISTS idx_users_redgate_email ON users_redgate(email);
-CREATE INDEX IF NOT EXISTS idx_users_redgate_last_login ON users_redgate(last_login_at);
-CREATE INDEX IF NOT EXISTS idx_users_redgate_active_users ON users_redgate(is_active, created_at);
+-- Note: UNIQUE constraints automatically create indexes, so username and email already have indexes
+CREATE INDEX idx_users_redgate_last_login ON users_redgate(last_login_at);
+CREATE INDEX idx_users_redgate_active_users ON users_redgate(is_active, created_at);
 
 -- Add some sample data to test data handling
 INSERT IGNORE INTO users_redgate (username, email, password_hash, first_name, last_name, is_active) VALUES

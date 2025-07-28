@@ -1,5 +1,5 @@
 -- Create e-commerce product system
-CREATE TABLE categories (
+CREATE TABLE IF NOT EXISTS categories (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     slug VARCHAR(100) NOT NULL UNIQUE,
@@ -18,7 +18,7 @@ CREATE TABLE categories (
     INDEX idx_active_sort (is_active, sort_order)
 );
 
-CREATE TABLE products (
+CREATE TABLE IF NOT EXISTS products (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     slug VARCHAR(255) NOT NULL UNIQUE,
@@ -50,7 +50,7 @@ CREATE TABLE products (
     FULLTEXT idx_search (name, description, short_description)
 );
 
-CREATE TABLE product_variants (
+CREATE TABLE IF NOT EXISTS product_variants (
     id INT AUTO_INCREMENT PRIMARY KEY,
     product_id INT NOT NULL,
     name VARCHAR(255) NOT NULL,

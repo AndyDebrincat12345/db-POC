@@ -583,13 +583,68 @@ User: {self.db_config['user']}
             
             for filename in files:
                 filepath = os.path.join(folder_path, filename)
-                with open(filepath, "r") as f:
+                with open(filepath, "r", encoding='utf-8') as f:
                     sql = f.read()
                 
-                statements = [stmt.strip() for stmt in sql.split(";") if stmt.strip()]
-                
-                for statement in statements:
-                    cursor.execute(statement)
+                # Handle different delimiters (for stored procedures)
+                if "DELIMITER" in sql:
+                    # Split by delimiter changes and execute each part
+                    parts = sql.split("DELIMITER")
+                    current_delimiter = ";"
+                    
+                    for i, part in enumerate(parts):
+                        if i == 0:
+                            # First part uses default delimiter
+                            statements = [stmt.strip() for stmt in part.split(";") if stmt.strip()]
+                            for statement in statements:
+                                if statement:
+                                    cursor.execute(statement)
+                                    # Consume all results to avoid "Unread result found" error
+                                    try:
+                                        cursor.fetchall()
+                                    except:
+                                        pass
+                        else:
+                            # Extract new delimiter and content
+                            lines = part.strip().split('\n', 1)
+                            if len(lines) >= 2:
+                                new_delimiter = lines[0].strip()
+                                content = lines[1] if len(lines) > 1 else ""
+                                
+                                if new_delimiter and content:
+                                    if new_delimiter == ";":
+                                        # Back to default delimiter
+                                        statements = [stmt.strip() for stmt in content.split(";") if stmt.strip()]
+                                        for statement in statements:
+                                            if statement:
+                                                cursor.execute(statement)
+                                                # Consume all results
+                                                try:
+                                                    cursor.fetchall()
+                                                except:
+                                                    pass
+                                    else:
+                                        # Custom delimiter (like //)
+                                        statements = [stmt.strip() for stmt in content.split(new_delimiter) if stmt.strip()]
+                                        for statement in statements:
+                                            if statement and not statement.startswith("DELIMITER"):
+                                                cursor.execute(statement)
+                                                # Consume all results
+                                                try:
+                                                    cursor.fetchall()
+                                                except:
+                                                    pass
+                else:
+                    # Standard SQL without delimiter changes
+                    statements = [stmt.strip() for stmt in sql.split(";") if stmt.strip()]
+                    for statement in statements:
+                        if statement:
+                            cursor.execute(statement)
+                            # Consume all results to avoid "Unread result found" error
+                            try:
+                                cursor.fetchall()
+                            except:
+                                pass
                 
                 conn.commit()
         
@@ -626,7 +681,7 @@ User: {self.db_config['user']}
     
     def reset_database(self):
         """Reset database"""
-        if messagebox.askyesno("Confirm Reset", "Are you sure you want to reset the database? This will drop all tables."):
+        if messagebox.askyesno("Confirm Reset", "Are you sure you want to reset the database? This will drop all tables and views."):
             self.update_status("Resetting database...")
             
             def reset():
@@ -637,20 +692,63 @@ User: {self.db_config['user']}
                     
                     cursor = conn.cursor()
                     
+                    # Disable foreign key checks and autocommit
                     cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
+                    cursor.execute("SET AUTOCOMMIT = 0")
+                    
+                    # First, drop all views (must be done before tables due to dependencies)
+                    cursor.execute("SHOW FULL TABLES WHERE Table_type = 'VIEW'")
+                    views = cursor.fetchall()
+                    for (view_name, table_type) in views:
+                        try:
+                            cursor.execute(f"DROP VIEW IF EXISTS `{view_name}`")
+                            print(f"Dropped view: {view_name}")
+                        except Exception as e:
+                            print(f"Error dropping view {view_name}: {e}")
+                    
+                    # Then drop all tables
                     cursor.execute("SHOW TABLES")
-                    tables = cursor.fetchall()
+                    all_objects = cursor.fetchall()
+                    tables = [obj[0] for obj in all_objects]
                     
-                    for (table,) in tables:
-                        cursor.execute(f"DROP TABLE {table}")
+                    # Drop tables in multiple passes to handle foreign key dependencies
+                    max_attempts = 3
+                    for attempt in range(max_attempts):
+                        cursor.execute("SHOW TABLES")
+                        remaining_tables = [table[0] for table in cursor.fetchall()]
+                        
+                        if not remaining_tables:
+                            break
+                            
+                        for table_name in remaining_tables:
+                            try:
+                                cursor.execute(f"DROP TABLE IF EXISTS `{table_name}`")
+                                print(f"Dropped table: {table_name}")
+                            except Exception as e:
+                                print(f"Attempt {attempt+1}: Error dropping table {table_name}: {e}")
                     
+                    # Re-enable foreign key checks
                     cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
+                    cursor.execute("SET AUTOCOMMIT = 1")
                     conn.commit()
+                    
+                    # Verify database is completely clean
+                    cursor.execute("SHOW TABLES")
+                    remaining_tables = cursor.fetchall()
+                    cursor.execute("SHOW FULL TABLES WHERE Table_type = 'VIEW'")
+                    remaining_views = cursor.fetchall()
+                    
+                    if remaining_tables or remaining_views:
+                        raise Exception(f"Database reset incomplete - Tables: {remaining_tables}, Views: {remaining_views}")
                     
                     cursor.close()
                     conn.close()
                     
-                    self.root.after(0, lambda: self.log_result("🔄 Database reset completed"))
+                    # Add a longer delay to ensure reset is complete
+                    import time
+                    time.sleep(1.0)
+                    
+                    self.root.after(0, lambda: self.log_result("🔄 Database completely reset - all tables and views removed"))
                     self.root.after(0, lambda: self.update_status("Database reset completed"))
                     self.root.after(0, self.refresh_tables)
                     

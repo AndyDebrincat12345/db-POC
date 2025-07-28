@@ -1,5 +1,5 @@
 -- Create roles and permissions system
-CREATE TABLE roles (
+CREATE TABLE IF NOT EXISTS roles (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(50) NOT NULL UNIQUE,
     description TEXT,
@@ -7,7 +7,7 @@ CREATE TABLE roles (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE permissions (
+CREATE TABLE IF NOT EXISTS permissions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL UNIQUE,
     resource VARCHAR(50) NOT NULL,
@@ -18,7 +18,7 @@ CREATE TABLE permissions (
     INDEX idx_resource_action (resource, action)
 );
 
-CREATE TABLE role_permissions (
+CREATE TABLE IF NOT EXISTS role_permissions (
     role_id INT NOT NULL,
     permission_id INT NOT NULL,
     granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -30,7 +30,7 @@ CREATE TABLE role_permissions (
     FOREIGN KEY (granted_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
-CREATE TABLE user_roles (
+CREATE TABLE IF NOT EXISTS user_roles (
     user_id INT NOT NULL,
     role_id INT NOT NULL,
     assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

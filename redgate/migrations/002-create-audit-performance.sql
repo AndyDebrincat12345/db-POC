@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS audit_log (
 
 -- Create a procedure for audit logging
 DELIMITER //
-CREATE PROCEDURE IF NOT EXISTS log_audit_event(
+DROP PROCEDURE IF EXISTS log_audit_event//
+CREATE PROCEDURE log_audit_event(
     IN p_table_name VARCHAR(100),
     IN p_operation_type VARCHAR(10),
     IN p_record_id VARCHAR(50),
@@ -59,13 +60,5 @@ CREATE TABLE IF NOT EXISTS performance_test (
     INDEX idx_category_status (category_id, status),
     INDEX idx_price (price),
     INDEX idx_created_date (created_date),
-    INDEX idx_name_fulltext (name) -- For full-text search testing
-) PARTITION BY RANGE (YEAR(created_date)) (
-    PARTITION p2020 VALUES LESS THAN (2021),
-    PARTITION p2021 VALUES LESS THAN (2022),
-    PARTITION p2022 VALUES LESS THAN (2023),
-    PARTITION p2023 VALUES LESS THAN (2024),
-    PARTITION p2024 VALUES LESS THAN (2025),
-    PARTITION p2025 VALUES LESS THAN (2026),
-    PARTITION pfuture VALUES LESS THAN MAXVALUE
+    INDEX idx_name (name)
 );
