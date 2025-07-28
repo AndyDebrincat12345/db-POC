@@ -1316,6 +1316,30 @@ Redgate: redgate/migrations/ (2 SQL files)
         except Exception as e:
             messagebox.showerror("Error", f"Failed to delete row: {str(e)}")
     
+    def is_auto_timestamp_column(self, col_name, col_type, col_default):
+        """Determine if a column should be automatically handled (not user input)"""
+        col_name_lower = col_name.lower()
+        col_type_lower = col_type.lower()
+        
+        # Common auto-timestamp column patterns
+        auto_timestamp_names = [
+            'created_at', 'updated_at', 'date_added', 'date_created', 'date_updated',
+            'timestamp', 'created_date', 'modified_date', 'insert_date', 'creation_time'
+        ]
+        
+        # Check if column name matches auto-timestamp patterns
+        if any(pattern in col_name_lower for pattern in auto_timestamp_names):
+            return True
+        
+        # Check if column type is timestamp/datetime with automatic default
+        if 'timestamp' in col_type_lower or 'datetime' in col_type_lower:
+            if col_default and ('current_timestamp' in str(col_default).lower() or 
+                               'now()' in str(col_default).lower() or
+                               col_default == 'CURRENT_TIMESTAMP'):
+                return True
+        
+        return False
+    
     def create_row_input_dialog(self, table_name, columns, mode, current_values=None):
         """Create dialog for adding/editing rows"""
         dialog = tk.Toplevel(self.root)
@@ -1333,11 +1357,32 @@ Redgate: redgate/migrations/ (2 SQL files)
         
         print(f"Creating dialog for {mode} in table {table_name}")  # Debug output
         
-        # Header
+        # Header with information about auto-handled fields
         header_label = tk.Label(dialog, text=f"{mode} Row in {table_name}",
                                bg=self.colors['primary_bg'], fg=self.colors['accent'],
                                font=('Segoe UI', 14, 'bold'))
-        header_label.pack(pady=20)
+        header_label.pack(pady=(20, 5))
+        
+        # Information about auto-handled fields
+        if mode == "Add":
+            auto_fields = []
+            for col in columns:
+                col_name = col[0]
+                col_type = col[1]
+                col_default = col[4]
+                is_auto_inc = 'auto_increment' in col[5].lower() if col[5] else False
+                
+                if is_auto_inc:
+                    auto_fields.append(f"{col_name} (auto-increment)")
+                elif self.is_auto_timestamp_column(col_name, col_type, col_default):
+                    auto_fields.append(f"{col_name} (auto-timestamp)")
+            
+            if auto_fields:
+                info_text = "Auto-handled fields: " + ", ".join(auto_fields)
+                info_label = tk.Label(dialog, text=info_text,
+                                     bg=self.colors['primary_bg'], fg=self.colors['text_light'],
+                                     font=('Segoe UI', 9), wraplength=400)
+                info_label.pack(pady=(0, 15))
         
         # Main content frame (for scrollable area)
         content_frame = tk.Frame(dialog, bg=self.colors['primary_bg'])
@@ -1376,11 +1421,15 @@ Redgate: redgate/migrations/ (2 SQL files)
             if mode == "Add" and is_auto_inc:
                 continue
             
+            # Skip timestamp columns with automatic defaults in add mode
+            if mode == "Add" and self.is_auto_timestamp_column(col_name, col_type, col_default):
+                continue
+            
             # Field frame
             field_frame = tk.Frame(scrollable_frame, bg=self.colors['primary_bg'])
             field_frame.pack(fill='x', pady=5, padx=10)
             
-            # Label
+            # Label with improved information
             label_text = f"{col_name} ({col_type})"
             if not is_nullable:
                 label_text += " *"

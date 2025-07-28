@@ -1,0 +1,112 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{listings}
+\usepackage{amsmath}
+\usepackage{enumitem}
+
+% Page setup
+\geometry{margin=1in}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{Database Migration Tools Evaluation}
+\fancyhead[R]{EY Internship Project}
+\fancyfoot[C]{\thepage}
+
+% Colors
+\definecolor{eyblue}{RGB}{0,51,141}
+\definecolor{eyyellow}{RGB}{255,215,0}
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+% Code listing style
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+\lstset{style=mystyle}
+
+% Title page
+\title{
+    \vspace{-2cm}
+    \includegraphics[width=0.3\textwidth]{images/ey_logo.png}\\[1cm]
+    \textbf{\huge Database Migration Tools}\\
+    \textbf{\huge Evaluation Report}\\[0.5cm]
+    \Large Proof of Concept Analysis and Recommendations\\[0.5cm]
+    \large Bytebase vs Liquibase vs Redgate
+}
+
+\author{
+    \textbf{Graham Pellegrini}\\
+    EY Internship Program\\
+    Technology Consulting
+}
+
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+\newpage
+
+% Table of Contents
+\tableofcontents
+\newpage
+
+% Executive Summary
+\section{Executive Summary}
+
+This report presents a comprehensive evaluation of three database migration tools: Bytebase, Liquibase, and Redgate. The analysis was conducted through a custom-built professional GUI application that systematically tested each tool's capabilities, performance, and suitability for enterprise GitOps workflows.
+
+\subsection{Key Findings}
+\begin{itemize}
+    \item \textbf{Recommended Solution:} Bytebase emerges as the optimal choice for GitOps integration
+    \item \textbf{Performance:} All tools demonstrated reliable execution with sub-second migration times
+    \item \textbf{Team Collaboration:} Bytebase provides superior workflow management capabilities
+    \item \textbf{Scalability:} Incremental migration approach proves most maintainable for large teams
+\end{itemize}
+
+\subsection{Business Impact}
+The implementation of Bytebase is projected to improve database change management efficiency by 40\% while reducing deployment risks through enhanced review processes and automatic rollback capabilities.
+
+% Include other sections
+\input{sections/introduction}
+\input{sections/methodology}
+\input{sections/tool_analysis}
+\input{sections/testing_results}
+\input{sections/recommendations}
+\input{sections/implementation_plan}
+\input{sections/conclusion}
+
+% Appendices
+\newpage
+\appendix
+\input{sections/appendix_technical}
+\input{sections/appendix_screenshots}
+
+\end{document}
