@@ -132,14 +132,14 @@ class ProfessionalMigrationGUI:
     
     def create_interface(self):
         """Create the main interface"""
+        # Status bar (create first so status_label exists)
+        self.create_status_bar()
+        
         # Header
         self.create_header()
         
         # Main content area
         self.create_main_content()
-        
-        # Status bar
-        self.create_status_bar()
     
     def create_header(self):
         """Create professional header"""
@@ -859,13 +859,6 @@ User: {self.db_config['user']}
         self.results_text.insert('end', f"{message}\n")
         self.results_text.see('end')
 
-def main():
-    root = tk.Tk()
-    app = ProfessionalMigrationGUI(root)
-    root.mainloop()
-
-if __name__ == "__main__":
-    main()
 def main():
     root = tk.Tk()
     app = ProfessionalMigrationGUI(root)
