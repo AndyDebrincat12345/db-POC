@@ -196,7 +196,7 @@ class ProfessionalMigrationGUI:
         
         # Connection status
         self.connection_status = tk.Label(header_frame,
-                                         text="🔴 Disconnected",
+                                         text="DISCONNECTED",
                                          bg=self.colors['secondary_bg'],
                                          fg=self.colors['error'],
                                          font=('Segoe UI', 10, 'bold'))
@@ -258,7 +258,7 @@ class ProfessionalMigrationGUI:
         
         # Bytebase card
         self.create_migration_card(cards_frame, 
-                                  "🔵 Bytebase", 
+                                  "Bytebase", 
                                   "Incremental SQL Migrations",
                                   "5 files - Git-like incremental changes\nModern UI-driven workflow",
                                   self.colors['accent'],
@@ -266,15 +266,15 @@ class ProfessionalMigrationGUI:
         
         # Liquibase card  
         self.create_migration_card(cards_frame,
-                                  "🟡 Liquibase",
+                                  "Liquibase",
                                   "Enterprise XML Migrations", 
                                   "3 files - Enterprise batch releases\nDatabase-agnostic changesets",
-                                  '#ffa500',
+                                  '#6a5acd',
                                   lambda: self.run_migration('liquibase'))
         
         # Redgate card
         self.create_migration_card(cards_frame,
-                                  "🔴 Redgate", 
+                                  "Redgate", 
                                   "Traditional SQL Scripts",
                                   "2 files - DBA comprehensive scripts\nPure SQL approach",
                                   '#ff6b6b',
@@ -285,17 +285,17 @@ class ProfessionalMigrationGUI:
         actions_frame.pack(fill='x', padx=40, pady=30)
         
         ttk.Button(actions_frame, 
-                  text="🤖 Run All Tests (Automated)",
+                  text="Run All Tests (Automated)",
                   style='Professional.TButton',
                   command=self.run_automated_test).pack(side='left', padx=(0, 10))
         
         ttk.Button(actions_frame,
-                  text="🔄 Reset Database", 
+                  text="Reset Database", 
                   style='Danger.TButton',
                   command=self.reset_database).pack(side='left', padx=10)
         
         ttk.Button(actions_frame,
-                  text="📊 Quick Analysis",
+                  text="Quick Analysis",
                   style='Success.TButton', 
                   command=self.quick_analysis).pack(side='right')
     
@@ -311,11 +311,21 @@ class ProfessionalMigrationGUI:
         content_frame = tk.Frame(card, bg=self.colors['secondary_bg'])
         content_frame.pack(fill='both', expand=True, padx=20, pady=20)
         
-        # Title
-        title_label = tk.Label(content_frame, text=title,
+        # Title with colored indicator
+        title_frame = tk.Frame(content_frame, bg=self.colors['secondary_bg'])
+        title_frame.pack(anchor='w', fill='x')
+        
+        # Colored circle indicator
+        indicator_label = tk.Label(title_frame, text="●",
+                                  bg=self.colors['secondary_bg'],
+                                  fg=color, font=('Segoe UI', 20, 'bold'))
+        indicator_label.pack(side='left', padx=(0, 10))
+        
+        # Title text
+        title_label = tk.Label(title_frame, text=title,
                               bg=self.colors['secondary_bg'],
                               fg=color, font=('Segoe UI', 16, 'bold'))
-        title_label.pack(anchor='w')
+        title_label.pack(side='left')
         
         # Subtitle
         subtitle_label = tk.Label(content_frame, text=subtitle,
@@ -336,7 +346,7 @@ class ProfessionalMigrationGUI:
         button_frame = tk.Frame(content_frame, bg=self.colors['secondary_bg'])
         button_frame.pack(fill='x')
         
-        run_button = tk.Button(button_frame, text=f"Run {title.split()[1]} Migration",
+        run_button = tk.Button(button_frame, text=f"Run {title} Migration",
                               bg=color, fg=self.colors['text_dark'],
                               font=('Segoe UI', 10, 'bold'),
                               border=0, padx=20, pady=8,
@@ -421,23 +431,23 @@ class ProfessionalMigrationGUI:
                                        state='readonly', width=30)
         self.table_combo.pack(side='left', padx=(0, 10))
         
-        ttk.Button(controls_frame, text="🔄 Refresh Tables",
+        ttk.Button(controls_frame, text="Refresh Tables",
                   style='Professional.TButton',
                   command=self.refresh_tables).pack(side='left', padx=10)
         
-        ttk.Button(controls_frame, text="📋 Load Data", 
+        ttk.Button(controls_frame, text="Load Data", 
                   style='Success.TButton',
                   command=self.load_table_data).pack(side='left', padx=10)
         
-        ttk.Button(controls_frame, text="➕ Add Row",
+        ttk.Button(controls_frame, text="Add Row",
                   style='Professional.TButton',
                   command=self.add_table_row).pack(side='left', padx=10)
         
-        ttk.Button(controls_frame, text="✏️ Edit Row",
+        ttk.Button(controls_frame, text="Edit Row",
                   style='Professional.TButton',
                   command=self.edit_table_row).pack(side='left', padx=10)
         
-        ttk.Button(controls_frame, text="🗑️ Delete Row",
+        ttk.Button(controls_frame, text="Delete Row",
                   style='Danger.TButton',
                   command=self.delete_table_row).pack(side='left', padx=10)
         
@@ -490,17 +500,13 @@ class ProfessionalMigrationGUI:
         controls_frame = ttk.Frame(tab_frame, style='Professional.TFrame')
         controls_frame.pack(fill='x', padx=20, pady=(0, 10))
         
-        ttk.Button(controls_frame, text="🔍 Schema Analysis",
+        ttk.Button(controls_frame, text="Schema Analysis",
                   style='Professional.TButton',
                   command=self.analyze_database).pack(side='left', padx=(0, 10))
         
-        ttk.Button(controls_frame, text="📈 Performance Report",
+        ttk.Button(controls_frame, text="Migration Tools Info",
                   style='Success.TButton', 
-                  command=self.performance_report).pack(side='left', padx=10)
-        
-        ttk.Button(controls_frame, text="📋 Migration Comparison",
-                  style='Professional.TButton', 
-                  command=self.migration_comparison_report).pack(side='left', padx=10)
+                  command=self.show_migration_tools_info).pack(side='left', padx=10)
         
         # Analysis content
         analysis_frame = ttk.Frame(tab_frame, style='Professional.TFrame')
@@ -528,13 +534,19 @@ class ProfessionalMigrationGUI:
         self.analysis_text.bind('<Leave>', unbind_analysis_mousewheel)
         
         # Initial content
-        self.analysis_text.insert('1.0', "Database Schema Analysis & Performance Insights\n")
-        self.analysis_text.insert('end', "="*60 + "\n\n")
-        self.analysis_text.insert('end', "This tab provides detailed analysis of your database:\n\n")
-        self.analysis_text.insert('end', "• Schema Analysis - Examine table structures, relationships, and constraints\n")
-        self.analysis_text.insert('end', "• Performance Report - Analyze query performance and optimization opportunities\n")
-        self.analysis_text.insert('end', "• Migration Comparison - Compare results from different migration tools\n\n")
-        self.analysis_text.insert('end', "Select an analysis type above to begin...\n")
+        self.analysis_text.insert('1.0', "Database Schema Analysis & Migration Tools Information\n")
+        self.analysis_text.insert('end', "="*65 + "\n\n")
+        self.analysis_text.insert('end', "This tab provides detailed analysis and information:\n\n")
+        self.analysis_text.insert('end', "Schema Analysis - Examine your database structure, tables, and relationships\n")
+        self.analysis_text.insert('end', "   • Table details and record counts\n")
+        self.analysis_text.insert('end', "   • Column information and data types\n")
+        self.analysis_text.insert('end', "   • Database optimization recommendations\n\n")
+        self.analysis_text.insert('end', "Migration Tools Info - Comprehensive comparison guide\n")
+        self.analysis_text.insert('end', "   • Detailed comparison of Redgate, Bytebase, and Liquibase\n")
+        self.analysis_text.insert('end', "   • Pros and cons of each approach\n")
+        self.analysis_text.insert('end', "   • Testing recommendations and decision factors\n")
+        self.analysis_text.insert('end', "   • File structures and implementation details\n\n")
+        self.analysis_text.insert('end', "Select an option above to begin your analysis...\n")
     
     def create_settings_tab(self):
         """Create settings and configuration tab"""
@@ -568,7 +580,7 @@ User: {self.db_config['user']}
                 font=('Consolas', 10), justify='left').pack(pady=10, padx=10, anchor='w')
         
         # Test connection button
-        ttk.Button(db_frame, text="🔌 Test Connection",
+        ttk.Button(db_frame, text="Test Connection",
                   style='Professional.TButton',
                   command=self.test_connection).pack(pady=10)
         
@@ -577,9 +589,9 @@ User: {self.db_config['user']}
         paths_frame.pack(fill='x', pady=(0, 20))
         
         paths_info = """
-🔵 Bytebase: bytebase/migrations/ (5 SQL files)
-🟡 Liquibase: liquibase/changelog/ (3 XML files) 
-🔴 Redgate: redgate/migrations/ (2 SQL files)
+Bytebase: bytebase/migrations/ (5 SQL files)
+Liquibase: liquibase/changelog/ (3 XML files) 
+Redgate: redgate/migrations/ (2 SQL files)
         """
         
         tk.Label(paths_frame, text=paths_info.strip(),
@@ -628,10 +640,10 @@ User: {self.db_config['user']}
         conn = self.get_connection()
         if conn:
             conn.close()
-            self.connection_status.config(text="🟢 Connected", fg=self.colors['success'])
+            self.connection_status.config(text="CONNECTED", fg=self.colors['success'])
             self.update_status("Database connection successful")
         else:
-            self.connection_status.config(text="🔴 Disconnected", fg=self.colors['error'])
+            self.connection_status.config(text="DISCONNECTED", fg=self.colors['error'])
             self.update_status("Database connection failed")
     
     def update_status(self, message):
@@ -656,11 +668,11 @@ User: {self.db_config['user']}
                 
                 execution_time = time.time() - start_time
                 
-                self.root.after(0, lambda: self.log_result(f"✅ {tool.capitalize()} migration completed in {execution_time:.2f}s"))
+                self.root.after(0, lambda: self.log_result(f"SUCCESS: {tool.capitalize()} migration completed in {execution_time:.2f}s"))
                 self.root.after(0, lambda: self.update_status(f"{tool.capitalize()} migration completed"))
                 
             except Exception as e:
-                self.root.after(0, lambda: self.log_result(f"❌ {tool.capitalize()} migration failed: {str(e)}"))
+                self.root.after(0, lambda: self.log_result(f"ERROR: {tool.capitalize()} migration failed: {str(e)}"))
                 self.root.after(0, lambda: self.update_status(f"{tool.capitalize()} migration failed"))
         
         threading.Thread(target=migrate, daemon=True).start()
@@ -765,7 +777,7 @@ User: {self.db_config['user']}
     def run_automated_test(self):
         """Run automated comparison test"""
         self.update_status("Running automated test...")
-        self.log_result("🤖 Starting automated migration tool comparison...\n")
+        self.log_result("AUTOMATED TEST: Starting automated migration tool comparison...\n")
         
         def run_test():
             try:
@@ -784,7 +796,7 @@ User: {self.db_config['user']}
                 self.root.after(0, lambda: self.update_status("Automated test completed"))
                 
             except Exception as e:
-                self.root.after(0, lambda: self.log_result(f"❌ Automated test failed: {str(e)}"))
+                self.root.after(0, lambda: self.log_result(f"ERROR: Automated test failed: {str(e)}"))
                 self.root.after(0, lambda: self.update_status("Automated test failed"))
         
         threading.Thread(target=run_test, daemon=True).start()
@@ -858,12 +870,12 @@ User: {self.db_config['user']}
                     import time
                     time.sleep(1.0)
                     
-                    self.root.after(0, lambda: self.log_result("🔄 Database completely reset - all tables and views removed"))
+                    self.root.after(0, lambda: self.log_result("DATABASE RESET: Database completely reset - all tables and views removed"))
                     self.root.after(0, lambda: self.update_status("Database reset completed"))
                     self.root.after(0, self.refresh_tables)
                     
                 except Exception as e:
-                    self.root.after(0, lambda: self.log_result(f"❌ Database reset failed: {str(e)}"))
+                    self.root.after(0, lambda: self.log_result(f"ERROR: Database reset failed: {str(e)}"))
                     self.root.after(0, lambda: self.update_status("Database reset failed"))
             
             threading.Thread(target=reset, daemon=True).start()
@@ -884,18 +896,18 @@ User: {self.db_config['user']}
                 cursor.execute("SHOW TABLES")
                 tables = cursor.fetchall()
                 
-                analysis = f"📊 Quick Analysis Results ({datetime.now().strftime('%H:%M:%S')})\n"
+                analysis = f"QUICK ANALYSIS: Quick Analysis Results ({datetime.now().strftime('%H:%M:%S')})\n"
                 analysis += "=" * 50 + "\n"
-                analysis += f"📋 Total tables: {len(tables)}\n\n"
+                analysis += f"Total tables: {len(tables)}\n\n"
                 
                 if tables:
-                    analysis += "📝 Tables found:\n"
+                    analysis += "Tables found:\n"
                     for (table,) in tables:
                         cursor.execute(f"SELECT COUNT(*) FROM {table}")
                         count = cursor.fetchone()[0]
                         analysis += f"  • {table}: {count} records\n"
                 else:
-                    analysis += "ℹ️  No tables found - run migrations first\n"
+                    analysis += "INFO: No tables found - run migrations first\n"
                 
                 cursor.close()
                 conn.close()
@@ -904,7 +916,7 @@ User: {self.db_config['user']}
                 self.root.after(0, lambda: self.update_status("Quick analysis completed"))
                 
             except Exception as e:
-                self.root.after(0, lambda: self.log_result(f"❌ Analysis failed: {str(e)}"))
+                self.root.after(0, lambda: self.log_result(f"ERROR: Analysis failed: {str(e)}"))
                 self.root.after(0, lambda: self.update_status("Analysis failed"))
         
         threading.Thread(target=analyze, daemon=True).start()
@@ -988,7 +1000,7 @@ User: {self.db_config['user']}
                 
                 cursor = conn.cursor()
                 
-                analysis = f"🔍 Detailed Database Analysis\n"
+                analysis = f"DETAILED DATABASE ANALYSIS\n"
                 analysis += f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
                 analysis += "=" * 60 + "\n\n"
                 
@@ -996,11 +1008,11 @@ User: {self.db_config['user']}
                 cursor.execute("SHOW TABLES")
                 tables = cursor.fetchall()
                 
-                analysis += f"📊 SUMMARY\n"
+                analysis += f"SUMMARY\n"
                 analysis += f"Total Tables: {len(tables)}\n\n"
                 
                 if tables:
-                    analysis += f"📋 TABLE DETAILS\n"
+                    analysis += f"TABLE DETAILS\n"
                     analysis += "-" * 40 + "\n"
                     
                     for (table,) in tables:
@@ -1011,7 +1023,7 @@ User: {self.db_config['user']}
                         cursor.execute(f"DESCRIBE {table}")
                         columns = cursor.fetchall()
                         
-                        analysis += f"\n🗂️  {table.upper()}\n"
+                        analysis += f"\n{table.upper()}\n"
                         analysis += f"   Records: {count}\n"
                         analysis += f"   Columns: {len(columns)}\n"
                         
@@ -1023,9 +1035,9 @@ User: {self.db_config['user']}
                             analysis += f"   ... and {len(columns) - 5} more columns\n"
                 
                 else:
-                    analysis += "ℹ️  No tables found. Run migrations to create database schema.\n"
+                    analysis += "INFO: No tables found. Run migrations to create database schema.\n"
                 
-                analysis += f"\n📈 RECOMMENDATIONS\n"
+                analysis += f"\nRECOMMENDATIONS\n"
                 analysis += "-" * 40 + "\n"
                 
                 if len(tables) > 0:
@@ -1044,23 +1056,117 @@ User: {self.db_config['user']}
                 self.root.after(0, lambda: self.update_status("Detailed analysis completed"))
                 
             except Exception as e:
-                error_msg = f"❌ Analysis failed: {str(e)}"
+                error_msg = f"ERROR: Analysis failed: {str(e)}"
                 self.root.after(0, lambda: self.analysis_text.insert('1.0', error_msg))
                 self.root.after(0, lambda: self.update_status("Analysis failed"))
         
         threading.Thread(target=analyze, daemon=True).start()
     
-    def performance_report(self):
-        """Generate performance report"""
+    def show_migration_tools_info(self):
+        """Show comprehensive information about migration tools"""
         self.analysis_text.delete('1.0', 'end')
-        self.analysis_text.insert('1.0', "📈 Generating performance report...\n\n")
-        self.analysis_text.insert('end', "This feature analyzes migration performance metrics.\n")
-        self.analysis_text.insert('end', "Run the automated test first to generate performance data.\n\n")
-        self.analysis_text.insert('end', "Performance metrics include:\n")
-        self.analysis_text.insert('end', "• Execution time comparison\n")
-        self.analysis_text.insert('end', "• Error handling analysis\n") 
-        self.analysis_text.insert('end', "• Resource usage patterns\n")
-        self.analysis_text.insert('end', "• Scalability assessment\n")
+        
+        info = f"DATABASE MIGRATION TOOLS COMPARISON\n"
+        info += f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        info += "=" * 70 + "\n\n"
+        
+        info += "OVERVIEW\n"
+        info += "-" * 30 + "\n"
+        info += "This POC compares three different approaches to database migrations:\n"
+        info += "• Traditional SQL Scripts (Redgate style)\n"
+        info += "• Modern Incremental Migrations (Bytebase style)\n"
+        info += "• Enterprise XML Changesets (Liquibase)\n\n"
+        
+        info += "REDGATE APPROACH\n"
+        info += "-" * 30 + "\n"
+        info += "File Count: 2 SQL files\n"
+        info += "Approach: Traditional DBA comprehensive scripts\n"
+        info += "Structure:\n"
+        info += "  • schema.sql - Complete database schema with all objects\n"
+        info += "  • data.sql - Initial data population\n\n"
+        info += "Characteristics:\n"
+        info += "  + Pure SQL - no abstraction layer\n"
+        info += "  + Complete control over SQL execution\n"
+        info += "  + Supports complex stored procedures and functions\n"
+        info += "  + Familiar to traditional DBAs\n"
+        info += "  - No built-in rollback mechanisms\n"
+        info += "  - Manual dependency management\n"
+        info += "  - Harder to track individual changes\n\n"
+        info += "Best For: Teams with strong SQL expertise, complex database logic\n\n"
+        
+        info += "BYTEBASE APPROACH\n"
+        info += "-" * 30 + "\n"
+        info += "File Count: 5 SQL files\n"
+        info += "Approach: Git-like incremental changes\n"
+        info += "Structure:\n"
+        info += "  • 001_initial_schema.sql - Base tables\n"
+        info += "  • 002_add_users.sql - User management\n"
+        info += "  • 003_add_orders.sql - Order system\n"
+        info += "  • 004_add_products.sql - Product catalog\n"
+        info += "  • 005_add_relationships.sql - Foreign keys\n\n"
+        info += "Characteristics:\n"
+        info += "  + Incremental change tracking\n"
+        info += "  + UI-driven workflow\n"
+        info += "  + Built-in version control integration\n"
+        info += "  + Automatic rollback capabilities\n"
+        info += "  + Team collaboration features\n"
+        info += "  - Learning curve for traditional DBAs\n"
+        info += "  - May require workflow changes\n\n"
+        info += "Best For: Development teams, CI/CD pipelines, collaborative environments\n\n"
+        
+        info += "LIQUIBASE APPROACH\n"
+        info += "-" * 30 + "\n"
+        info += "File Count: 3 XML files + properties\n"
+        info += "Approach: Enterprise database-agnostic changesets\n"
+        info += "Structure:\n"
+        info += "  • db.changelog-master.xml - Main changelog\n"
+        info += "  • create-tables.xml - Table definitions\n"
+        info += "  • insert-data.xml - Data population\n"
+        info += "  • liquibase.properties - Configuration\n\n"
+        info += "Characteristics:\n"
+        info += "  + Database-agnostic (MySQL, PostgreSQL, Oracle, etc.)\n"
+        info += "  + Enterprise-grade rollback support\n"
+        info += "  + Extensive change types and validations\n"
+        info += "  + Integration with major IDEs and CI/CD\n"
+        info += "  + Preconditions and context support\n"
+        info += "  - XML can be verbose and complex\n"
+        info += "  - Steeper learning curve\n"
+        info += "  - Requires Liquibase knowledge\n\n"
+        info += "Best For: Enterprise environments, multi-database support, complex deployment pipelines\n\n"
+        
+        info += "COMPARISON MATRIX\n"
+        info += "-" * 30 + "\n"
+        info += f"{'Aspect':<20} {'Redgate':<12} {'Bytebase':<12} {'Liquibase':<12}\n"
+        info += f"{'Complexity':<20} {'Low':<12} {'Medium':<12} {'High':<12}\n"
+        info += f"{'Learning Curve':<20} {'Minimal':<12} {'Moderate':<12} {'Steep':<12}\n"
+        info += f"{'Rollback Support':<20} {'Manual':<12} {'Automatic':<12} {'Enterprise':<12}\n"
+        info += f"{'Team Collaboration':<20} {'Basic':<12} {'Excellent':<12} {'Good':<12}\n"
+        info += f"{'Database Support':<20} {'MySQL':<12} {'Multiple':<12} {'Universal':<12}\n"
+        info += f"{'File Count':<20} {'2':<12} {'5':<12} {'3+config':<12}\n"
+        info += f"{'Format':<20} {'Pure SQL':<12} {'SQL':<12} {'XML':<12}\n\n"
+        
+        info += "TESTING RECOMMENDATIONS\n"
+        info += "-" * 30 + "\n"
+        info += "1. Run each migration tool individually to compare execution times\n"
+        info += "2. Use 'Reset Database' between tests for clean comparisons\n"
+        info += "3. Check the Console tab for detailed execution logs\n"
+        info += "4. Use 'Schema Analysis' to verify each tool creates the same structure\n"
+        info += "5. Test rollback capabilities (where supported)\n\n"
+        info += "WHAT TO LOOK FOR IN RESULTS\n"
+        info += "-" * 30 + "\n"
+        info += "• Execution speed differences\n"
+        info += "• Error handling and recovery\n"
+        info += "• Final database structure consistency\n"
+        info += "• Ease of debugging from console output\n"
+        info += "• Rollback and recovery capabilities\n\n"
+        info += "DECISION FACTORS\n"
+        info += "-" * 30 + "\n"
+        info += "Choose Redgate if: You have strong SQL skills and simple deployment needs\n"
+        info += "Choose Bytebase if: You want modern DevOps integration and team collaboration\n"
+        info += "Choose Liquibase if: You need enterprise features and multi-database support\n"
+        
+        self.analysis_text.insert('1.0', info)
+        self.update_status("Migration tools information displayed")
     
     def log_result(self, message):
         """Log result to console tab"""
@@ -1368,7 +1474,7 @@ User: {self.db_config['user']}
                 messagebox.showerror("Error", f"Failed to {mode.lower()} row: {str(e)}")
         
         # Create highly visible buttons fixed at the bottom - always visible
-        save_button = tk.Button(button_frame, text=f"✅ {mode} Row",
+        save_button = tk.Button(button_frame, text=f"{mode} Row",
                               bg='#00FF00', fg='black',  # Bright green background
                               font=('Segoe UI', 12, 'bold'), 
                               command=save_row,
@@ -1379,7 +1485,7 @@ User: {self.db_config['user']}
                               activeforeground='black')
         save_button.pack(side='left', padx=(10, 5), pady=10, fill='both', expand=True)
         
-        cancel_button = tk.Button(button_frame, text="❌ Cancel",
+        cancel_button = tk.Button(button_frame, text="Cancel",
                                 bg='#FF4500', fg='white',  # Bright red/orange background
                                 font=('Segoe UI', 12, 'bold'),
                                 command=dialog.destroy,
@@ -1394,24 +1500,6 @@ User: {self.db_config['user']}
         print(f"Save button: {save_button}")  # Debug
         print(f"Cancel button: {cancel_button}")  # Debug
     
-    def migration_comparison_report(self):
-        """Generate migration comparison report"""
-        self.analysis_text.delete('1.0', 'end')
-        self.analysis_text.insert('1.0', "Migration Tool Comparison Report\n")
-        self.analysis_text.insert('end', "=" * 50 + "\n\n")
-        self.analysis_text.insert('end', "This report compares the three migration tools:\n\n")
-        self.analysis_text.insert('end', "TOOL CHARACTERISTICS:\n")
-        self.analysis_text.insert('end', "• Redgate: Traditional SQL scripts with stored procedures\n")
-        self.analysis_text.insert('end', "• Bytebase: Modern incremental SQL migrations\n")
-        self.analysis_text.insert('end', "• Liquibase: Enterprise XML-based changesets\n\n")
-        self.analysis_text.insert('end', "To generate actual performance data, run the automated test\n")
-        self.analysis_text.insert('end', "from the Migrations tab first.\n\n")
-        self.analysis_text.insert('end', "The comparison will show:\n")
-        self.analysis_text.insert('end', "• Execution times\n")
-        self.analysis_text.insert('end', "• Success/failure rates\n")
-        self.analysis_text.insert('end', "• Table creation counts\n")
-        self.analysis_text.insert('end', "• Error handling capabilities\n")
-
 def main():
     root = tk.Tk()
     app = ProfessionalMigrationGUI(root)
