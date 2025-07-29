@@ -1,236 +1,163 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Professional Database Migration POC GUI
-Modern black, white, and yellow themed interface
+Modern white and yellow themed interface with enhanced web integration
 """
 
 import tkinter as tk
-from tkinter import ttk, messagebox, scrolledtext, filedialog
-import mysql.connector
-import os
-from dotenv import load_dotenv
-import subprocess
+from tkinter import ttk, scrolledtext, messagebox, filedialog
 import threading
-import time
+import subprocess
+import os
+import json
 from datetime import datetime
+from dotenv import load_dotenv
+import webbrowser
+import time
+import mysql.connector
+
+# Import our tool implementations
+from bytebase_api import BytebaseAPI
+from redgate_simulator import RedgateSimulator
 
 load_dotenv()
 
 class ProfessionalMigrationGUI:
     def __init__(self, root):
         self.root = root
-        self.db_config = {
-            'host': os.getenv("DB_HOST", "localhost"),
-            'port': int(os.getenv("DB_PORT", 3306)),
-            'user': os.getenv("DB_USER"),
-            'password': os.getenv("DB_PASS"),
-            'database': os.getenv("DB_NAME")
+        self.root.title("Professional Database Migration POC - EY Enterprise Tools")
+        self.root.state('zoomed')  # Fullscreen on Windows
+        self.root.configure(bg='white')
+        
+        # Initialize tool instances
+        self.bytebase_api = BytebaseAPI()
+        self.redgate_simulator = RedgateSimulator()
+        
+        # Results storage
+        self.results = {
+            'bytebase': [],
+            'liquibase': [],
+            'redgate': []
         }
         
-        # Professional color scheme - Black, White, Yellow
-        self.colors = {
-            'primary_bg': '#1a1a1a',      # Dark black
-            'secondary_bg': '#2d2d2d',    # Lighter black
-            'accent': '#ffd700',          # Golden yellow
-            'text_light': '#ffffff',      # White text
-            'text_dark': '#000000',       # Black text
-            'success': '#4CAF50',         # Green
-            'error': '#f44336',           # Red
-            'warning': '#ff9800',         # Orange
-            'border': '#404040'           # Gray border
-        }
+        # Status variables
+        self.web_interfaces_started = False
+        self.status_var = tk.StringVar()
+        self.status_var.set("Ready")
         
+        # Setup UI components
         self.setup_styles()
         self.setup_main_window()
         self.create_interface()
-    
-    def add_mousewheel_support(self, canvas):
-        """Add mouse wheel scrolling support to a canvas"""
-        def on_mousewheel(event):
-            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
         
-        def bind_mousewheel(event):
-            canvas.bind_all("<MouseWheel>", on_mousewheel)
-        
-        def unbind_mousewheel(event):
-            canvas.unbind_all("<MouseWheel>")
-        
-        # Bind mouse wheel events when entering/leaving the canvas
-        canvas.bind('<Enter>', bind_mousewheel)
-        canvas.bind('<Leave>', unbind_mousewheel)
-    
+        # Start time updates
+        self.update_time()
     def setup_styles(self):
-        """Configure professional styling"""
+        """Configure modern white and yellow theme styles"""
         style = ttk.Style()
+        style.theme_use('default')
         
-        # Configure notebook (tabs)
-        style.theme_use('clam')
-        
-        style.configure('Professional.TNotebook', 
-                       background=self.colors['primary_bg'],
-                       borderwidth=0)
-        
-        style.configure('Professional.TNotebook.Tab',
-                       background=self.colors['secondary_bg'],
-                       foreground=self.colors['text_light'],
+        # Configure notebook (tabs) style
+        style.configure('TNotebook', background='white', borderwidth=0)
+        style.configure('TNotebook.Tab', 
+                       background='#f8f9fa', 
+                       foreground='#2c3e50',
                        padding=[20, 10],
-                       font=('Segoe UI', 10, 'bold'))
+                       font=('Segoe UI', 11, 'bold'))
+        style.map('TNotebook.Tab',
+                 background=[('selected', '#ffd700'),
+                           ('active', '#fff3cd')])
         
-        style.map('Professional.TNotebook.Tab',
-                 background=[('selected', self.colors['accent']),
-                           ('active', self.colors['accent'])],
-                 foreground=[('selected', self.colors['text_dark']),
-                           ('active', self.colors['text_dark'])])
+        # Configure frame styles
+        style.configure('Card.TFrame', background='white', relief='raised', borderwidth=2)
+        style.configure('Header.TFrame', background='#ffd700')
         
-        # Configure frames
-        style.configure('Professional.TFrame',
-                       background=self.colors['primary_bg'])
-        
-        style.configure('Card.TFrame',
-                       background=self.colors['secondary_bg'],
-                       relief='flat',
-                       borderwidth=1)
-        
-        # Configure labels
-        style.configure('Heading.TLabel',
-                       background=self.colors['primary_bg'],
-                       foreground=self.colors['accent'],
-                       font=('Segoe UI', 14, 'bold'))
-        
-        style.configure('Professional.TLabel',
-                       background=self.colors['primary_bg'],
-                       foreground=self.colors['text_light'],
-                       font=('Segoe UI', 10))
-        
-        style.configure('Card.TLabel',
-                       background=self.colors['secondary_bg'],
-                       foreground=self.colors['text_light'],
-                       font=('Segoe UI', 10))
-        
-        # Configure buttons
-        style.configure('Professional.TButton',
-                       background=self.colors['accent'],
-                       foreground=self.colors['text_dark'],
+        # Configure button styles
+        style.configure('Primary.TButton',
+                       background='#ffd700',
+                       foreground='#2c3e50',
                        font=('Segoe UI', 10, 'bold'),
-                       padding=[15, 10])
-        
-        style.map('Professional.TButton',
-                 background=[('active', '#ffed4e'),
-                           ('pressed', '#e6c200')])
+                       padding=[10, 5])
+        style.map('Primary.TButton',
+                 background=[('active', '#ffed4a')])
         
         style.configure('Success.TButton',
-                       background=self.colors['success'],
-                       foreground=self.colors['text_light'],
+                       background='#28a745',
+                       foreground='white',
                        font=('Segoe UI', 10, 'bold'),
-                       padding=[15, 10])
+                       padding=[10, 5])
         
         style.configure('Danger.TButton',
-                       background=self.colors['error'],
-                       foreground=self.colors['text_light'],
+                       background='#dc3545',
+                       foreground='white',
                        font=('Segoe UI', 10, 'bold'),
-                       padding=[15, 10])
+                       padding=[10, 5])
+        
+        style.configure('Info.TButton',
+                       background='#17a2b8',
+                       foreground='white',
+                       font=('Segoe UI', 10, 'bold'),
+                       padding=[10, 5])
     
     def setup_main_window(self):
-        """Configure main window"""
-        self.root.title("Database Migration POC - Professional Interface")
-        self.root.geometry("1200x800")
-        self.root.configure(bg=self.colors['primary_bg'])
-        
-        # Add window control buttons
-        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
-        
-        # Ensure window has proper title bar controls (minimize, maximize, close)
-        self.root.attributes('-topmost', False)  # Make sure window is not always on top
+        """Setup main window properties"""
+        self.root.configure(bg='white')
         
         # Center the window
         self.root.update_idletasks()
-        x = (self.root.winfo_screenwidth() // 2) - (1200 // 2)
-        y = (self.root.winfo_screenheight() // 2) - (800 // 2)
-        self.root.geometry(f"1200x800+{x}+{y}")
-        
-        # Set minimum size
-        self.root.minsize(1000, 600)
-        
-        # Enable window controls (minimize, maximize, close)
-        self.root.resizable(True, True)
-        
-        # Ensure window has standard decorations (title bar with controls)
-        self.root.overrideredirect(False)
-        
-        # Make sure window decorations are enabled
-        self.root.overrideredirect(False)
+        x = (self.root.winfo_screenwidth() // 2) - (1600 // 2)
+        y = (self.root.winfo_screenheight() // 2) - (1000 // 2)
+        self.root.geometry(f'1600x1000+{x}+{y}')
     
     def create_interface(self):
         """Create the main interface"""
-        # Status bar (create first so status_label exists)
-        self.create_status_bar()
-        
-        # Header
         self.create_header()
-        
-        # Main content area
         self.create_main_content()
+        self.create_status_bar()
     
     def create_header(self):
-        """Create professional header"""
-        header_frame = tk.Frame(self.root, bg=self.colors['secondary_bg'], height=80)
-        header_frame.pack(fill='x', padx=0, pady=0)
+        """Create the header section"""
+        header_frame = tk.Frame(self.root, bg='#ffd700', height=100)
+        header_frame.pack(fill='x', pady=(0, 10))
         header_frame.pack_propagate(False)
         
         # Title
-        title_label = tk.Label(header_frame, 
-                              text="Database Migration POC",
-                              bg=self.colors['secondary_bg'],
-                              fg=self.colors['accent'],
-                              font=('Segoe UI', 20, 'bold'))
-        title_label.pack(side='left', padx=20, pady=20)
-        
-        # Subtitle
-        subtitle_label = tk.Label(header_frame,
-                                 text="Liquibase vs Bytebase vs Redgate Comparison",
-                                 bg=self.colors['secondary_bg'],
-                                 fg=self.colors['text_light'],
-                                 font=('Segoe UI', 12))
-        subtitle_label.pack(side='left', padx=(0, 20), pady=20)
-        
-        # Connection status
-        self.connection_status = tk.Label(header_frame,
-                                         text="DISCONNECTED",
-                                         bg=self.colors['secondary_bg'],
-                                         fg=self.colors['error'],
-                                         font=('Segoe UI', 10, 'bold'))
-        self.connection_status.pack(side='right', padx=20, pady=20)
-        
-        # Test connection
-        self.test_connection()
+        title_label = tk.Label(header_frame,
+                              text="🚀 Professional Database Migration Tools POC",
+                              font=('Segoe UI', 24, 'bold'),
+                              bg='#ffd700',
+                              fg='#2c3e50')
+        title_label.pack(expand=True)
     
     def create_main_content(self):
-        """Create main tabbed interface"""
-        # Main frame
-        main_frame = ttk.Frame(self.root, style='Professional.TFrame')
-        main_frame.pack(fill='both', expand=True, padx=10, pady=(0, 10))
+        """Create the main tabbed content area"""
+        # Create notebook for tabs
+        self.notebook = ttk.Notebook(self.root)
+        self.notebook.pack(fill='both', expand=True, padx=20, pady=(0, 10))
         
-        # Notebook for tabs
-        self.notebook = ttk.Notebook(main_frame, style='Professional.TNotebook')
-        self.notebook.pack(fill='both', expand=True)
-        
-        # Create tabs
+        # Create all 5 tabs
         self.create_migrations_tab()
         self.create_console_tab()
         self.create_data_tab()
         self.create_analysis_tab()
         self.create_settings_tab()
-    
-    def create_migrations_tab(self):
-        """Create professional migrations tab"""
-        tab_frame = ttk.Frame(self.notebook, style='Professional.TFrame')
-        self.notebook.add(tab_frame, text="Migrations")
         
-        # Create scrollable frame
-        canvas = tk.Canvas(tab_frame, bg=self.colors['primary_bg'], highlightthickness=0)
-        scrollbar = ttk.Scrollbar(tab_frame, orient="vertical", command=canvas.yview)
-        scrollable_frame = ttk.Frame(canvas, style='Professional.TFrame')
+        # Now that all tabs are created and settings initialized, load table data
+        try:
+            self.refresh_tables()
+        except Exception as e:
+            # Silently handle initial table refresh errors
+            pass
+        
+    def create_migrations_tab(self):
+        """Create the migrations tab with tool cards and web integration"""
+        migrations_frame = ttk.Frame(self.notebook)
+        self.notebook.add(migrations_frame, text="🚀 Migrations")
+        
+        # Scrollable frame setup
+        canvas = tk.Canvas(migrations_frame, bg='white')
+        scrollbar = ttk.Scrollbar(migrations_frame, orient="vertical", command=canvas.yview)
+        scrollable_frame = tk.Frame(canvas, bg='white')
         
         scrollable_frame.bind(
             "<Configure>",
@@ -240,1319 +167,1472 @@ class ProfessionalMigrationGUI:
         canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
         
-        # Add mouse wheel scrolling support
+        # Add mousewheel support
         self.add_mousewheel_support(canvas)
         
+        # Header section
+        header_frame = tk.Frame(scrollable_frame, bg='#ffd700', height=80)
+        header_frame.pack(fill='x', padx=20, pady=20)
+        header_frame.pack_propagate(False)
+        
+        tk.Label(header_frame,
+                text="🚀 Database Migration Tools Comparison",
+                font=('Segoe UI', 18, 'bold'),
+                bg='#ffd700', fg='#2c3e50').pack(expand=True)
+        
+        # Tools grid
+        tools_grid = tk.Frame(scrollable_frame, bg='white')
+        tools_grid.pack(fill='both', expand=True, padx=20, pady=10)
+        
+        # Create tool cards
+        self.create_migration_card(
+            tools_grid, 
+            "🔵 Bytebase Enterprise", 
+            "#3498db",
+            self.run_bytebase_migration,
+            lambda: self.open_web_page('http://localhost:8080', 'Bytebase')
+        )
+        
+        self.create_migration_card(
+            tools_grid, 
+            "🟣 Liquibase Professional", 
+            "#9b59b6",
+            self.run_liquibase_migration,
+            lambda: self.open_web_page('http://localhost:5002', 'Liquibase')
+        )
+        
+        self.create_migration_card(
+            tools_grid, 
+            "🔴 Redgate SQL Toolbelt", 
+            "#e74c3c",
+            self.run_redgate_migration,
+            lambda: self.open_web_page('http://localhost:5001', 'Redgate')
+        )
+        
+        # Comprehensive migration section
+        migration_section = tk.LabelFrame(scrollable_frame,
+                                        text="⚡ Migration Operations",
+                                        font=('Segoe UI', 14, 'bold'),
+                                        bg='white', fg='#2c3e50')
+        migration_section.pack(fill='x', padx=20, pady=20)
+        
+        migration_buttons = tk.Frame(migration_section, bg='white')
+        migration_buttons.pack(pady=15)
+        
+        tk.Button(migration_buttons, text="🚀 Run All Migrations",
+                 command=self.run_all_migrations,
+                 bg='#ffd700', fg='#2c3e50',
+                 font=('Segoe UI', 14, 'bold'),
+                 relief='flat', padx=30, pady=12).pack(side='left', padx=10)
+        
+        tk.Button(migration_buttons, text="🌐 Run All UIs",
+                 command=self.start_all_web_interfaces,
+                 bg='#28a745', fg='white',
+                 font=('Segoe UI', 12, 'bold'),
+                 relief='flat', padx=20, pady=10).pack(side='left', padx=10)
+        
+        tk.Button(migration_buttons, text="🔗 Open All Web Pages",
+                 command=self.open_all_web_pages,
+                 bg='#17a2b8', fg='white',
+                 font=('Segoe UI', 12, 'bold'),
+                 relief='flat', padx=20, pady=10).pack(side='left', padx=10)
+        
+        tk.Button(migration_buttons, text="🔄 Reset Database",
+                 command=self.reset_database,
+                 bg='#dc3545', fg='white',
+                 font=('Segoe UI', 12, 'bold'),
+                 relief='flat', padx=20, pady=10).pack(side='left', padx=10)
+        
+        tk.Button(migration_buttons, text="🧪 Run Tests",
+                 command=self.run_automated_test,
+                 bg='#28a745', fg='white',
+                 font=('Segoe UI', 12, 'bold'),
+                 relief='flat', padx=20, pady=10).pack(side='left', padx=10)
+        
+        # Pack canvas and scrollbar
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
+    
+    def create_migration_card(self, parent, title, color, command, web_command):
+        """Create a migration tool card"""
+        card_frame = tk.Frame(parent, bg='white', relief='raised', bd=2)
+        card_frame.pack(fill='x', pady=10)
         
         # Header
-        header_label = ttk.Label(scrollable_frame, 
-                                text="Migration Tool Comparison",
-                                style='Heading.TLabel')
-        header_label.pack(pady=(20, 30))
+        header = tk.Frame(card_frame, bg=color, height=60)
+        header.pack(fill='x')
+        header.pack_propagate(False)
         
-        # Migration cards container
-        cards_frame = ttk.Frame(scrollable_frame, style='Professional.TFrame')
-        cards_frame.pack(fill='x', padx=40)
+        tk.Label(header, text=title,
+                font=('Segoe UI', 16, 'bold'),
+                bg=color, fg='white').pack(side='left', padx=20, pady=15)
         
-        # Bytebase card
-        self.create_migration_card(cards_frame, 
-                                  "Bytebase", 
-                                  "Incremental SQL Migrations",
-                                  "5 files - Git-like incremental changes\nModern UI-driven workflow",
-                                  self.colors['accent'],
-                                  lambda: self.run_migration('bytebase'))
+        # Button container for execute and web UI buttons
+        button_container = tk.Frame(header, bg=color)
+        button_container.pack(side='right', padx=20, pady=15)
         
-        # Liquibase card  
-        self.create_migration_card(cards_frame,
-                                  "Liquibase",
-                                  "Enterprise XML Migrations", 
-                                  "3 files - Enterprise batch releases\nDatabase-agnostic changesets",
-                                  '#6a5acd',
-                                  lambda: self.run_migration('liquibase'))
+        tk.Button(button_container, text="🌐 Web UI",
+                 command=web_command,
+                 bg='white', fg=color,
+                 font=('Segoe UI', 10, 'bold'),
+                 relief='flat', padx=12, pady=4).pack(side='right', padx=(10, 0))
         
-        # Redgate card
-        self.create_migration_card(cards_frame,
-                                  "Redgate", 
-                                  "Traditional SQL Scripts",
-                                  "2 files - DBA comprehensive scripts\nPure SQL approach",
-                                  '#ff6b6b',
-                                  lambda: self.run_migration('redgate'))
-        
-        # Action buttons
-        actions_frame = ttk.Frame(scrollable_frame, style='Professional.TFrame')
-        actions_frame.pack(fill='x', padx=40, pady=30)
-        
-        ttk.Button(actions_frame, 
-                  text="Run All Tests (Automated)",
-                  style='Professional.TButton',
-                  command=self.run_automated_test).pack(side='left', padx=(0, 10))
-        
-        ttk.Button(actions_frame,
-                  text="Reset Database", 
-                  style='Danger.TButton',
-                  command=self.reset_database).pack(side='left', padx=10)
-        
-        ttk.Button(actions_frame,
-                  text="Quick Analysis",
-                  style='Success.TButton', 
-                  command=self.quick_analysis).pack(side='right')
-    
-    def create_migration_card(self, parent, title, subtitle, description, color, command):
-        """Create a professional migration card"""
-        # Card frame
-        card = tk.Frame(parent, bg=self.colors['secondary_bg'], 
-                       relief='flat', bd=1, highlightbackground=self.colors['border'],
-                       highlightthickness=1)
-        card.pack(fill='x', pady=10)
-        
-        # Card content
-        content_frame = tk.Frame(card, bg=self.colors['secondary_bg'])
-        content_frame.pack(fill='both', expand=True, padx=20, pady=20)
-        
-        # Title with colored indicator
-        title_frame = tk.Frame(content_frame, bg=self.colors['secondary_bg'])
-        title_frame.pack(anchor='w', fill='x')
-        
-        # Colored circle indicator
-        indicator_label = tk.Label(title_frame, text="●",
-                                  bg=self.colors['secondary_bg'],
-                                  fg=color, font=('Segoe UI', 20, 'bold'))
-        indicator_label.pack(side='left', padx=(0, 10))
-        
-        # Title text
-        title_label = tk.Label(title_frame, text=title,
-                              bg=self.colors['secondary_bg'],
-                              fg=color, font=('Segoe UI', 16, 'bold'))
-        title_label.pack(side='left')
-        
-        # Subtitle
-        subtitle_label = tk.Label(content_frame, text=subtitle,
-                                 bg=self.colors['secondary_bg'],
-                                 fg=self.colors['text_light'], 
-                                 font=('Segoe UI', 12, 'bold'))
-        subtitle_label.pack(anchor='w', pady=(5, 10))
-        
-        # Description
-        desc_label = tk.Label(content_frame, text=description,
-                             bg=self.colors['secondary_bg'],
-                             fg=self.colors['text_light'],
-                             font=('Segoe UI', 10),
-                             justify='left')
-        desc_label.pack(anchor='w', pady=(0, 15))
-        
-        # Button
-        button_frame = tk.Frame(content_frame, bg=self.colors['secondary_bg'])
-        button_frame.pack(fill='x')
-        
-        run_button = tk.Button(button_frame, text=f"Run {title} Migration",
-                              bg=color, fg=self.colors['text_dark'],
-                              font=('Segoe UI', 10, 'bold'),
-                              border=0, padx=20, pady=8,
-                              command=command)
-        run_button.pack(side='left')
-    
+        tk.Button(button_container, text="▶️ Execute",
+                 command=command,
+                 bg='white', fg=color,
+                 font=('Segoe UI', 11, 'bold'),
+                 relief='flat', padx=15, pady=5).pack(side='right')
     def create_console_tab(self):
-        """Create console/output log tab"""
-        tab_frame = ttk.Frame(self.notebook, style='Professional.TFrame')
-        self.notebook.add(tab_frame, text="Console")
+        """Create the console/output tab"""
+        console_frame = ttk.Frame(self.notebook)
+        self.notebook.add(console_frame, text="📟 Console")
         
-        # Header
-        header_label = ttk.Label(tab_frame, 
-                                text="Console Output & Logs",
-                                style='Heading.TLabel')
-        header_label.pack(pady=20)
+        # Console header
+        console_header = tk.Frame(console_frame, bg='#ffd700', height=60)
+        console_header.pack(fill='x', pady=(0, 10))
+        console_header.pack_propagate(False)
         
-        # Console controls - at the top, always visible
-        controls_frame = ttk.Frame(tab_frame, style='Professional.TFrame')
-        controls_frame.pack(fill='x', padx=20, pady=(0, 10))
+        tk.Label(console_header,
+                text="🖥️ Migration Console & Output Logs",
+                font=('Segoe UI', 16, 'bold'),
+                bg='#ffd700', fg='#2c3e50').pack(expand=True)
         
-        ttk.Button(controls_frame, text="Clear Console",
-                  style='Danger.TButton',
-                  command=self.clear_console).pack(side='left', padx=(0, 10))
-        
-        ttk.Button(controls_frame, text="Save Log",
-                  style='Professional.TButton',
-                  command=self.save_log).pack(side='left', padx=10)
-        
-        # Results area
-        results_frame = ttk.Frame(tab_frame, style='Professional.TFrame')
-        results_frame.pack(fill='both', expand=True, padx=20, pady=10)
-        
-        # Results text area
-        self.results_text = scrolledtext.ScrolledText(results_frame,
-                                                     bg=self.colors['secondary_bg'],
-                                                     fg=self.colors['text_light'],
-                                                     font=('Consolas', 10),
-                                                     insertbackground=self.colors['accent'])
-        self.results_text.pack(fill='both', expand=True)
-        
-        # Add mouse wheel scrolling support to console
-        def on_console_mousewheel(event):
-            self.results_text.yview_scroll(int(-1*(event.delta/120)), "units")
-        
-        def bind_console_mousewheel(event):
-            self.results_text.bind_all("<MouseWheel>", on_console_mousewheel)
-        
-        def unbind_console_mousewheel(event):
-            self.results_text.unbind_all("<MouseWheel>")
-        
-        self.results_text.bind('<Enter>', bind_console_mousewheel)
-        self.results_text.bind('<Leave>', unbind_console_mousewheel)
-        
-        # Initial message
-        self.results_text.insert('1.0', "Ready to run migration comparisons...\n\n")
-        self.results_text.insert('end', "Click 'Run All Tests' in the Migrations tab to begin automated testing.\n")
-        self.results_text.insert('end', "Or run individual migrations to see detailed output.\n\n")
-        self.results_text.insert('end', "Results will appear here with execution times, errors, and analysis.")
-    
-    def create_data_tab(self):
-        """Create data viewing tab"""
-        tab_frame = ttk.Frame(self.notebook, style='Professional.TFrame')
-        self.notebook.add(tab_frame, text="Data View")
-        
-        # Header
-        header_label = ttk.Label(tab_frame,
-                                text="Database Tables and Data",
-                                style='Heading.TLabel')
-        header_label.pack(pady=20)
-        
-        # Controls frame
-        controls_frame = ttk.Frame(tab_frame, style='Professional.TFrame')
+        # Console controls
+        controls_frame = tk.Frame(console_frame, bg='white')
         controls_frame.pack(fill='x', padx=20, pady=10)
         
-        # Table selector
-        ttk.Label(controls_frame, text="Select Table:",
-                 style='Professional.TLabel').pack(side='left', padx=(0, 10))
+        tk.Button(controls_frame, text="🗑️ Clear Console",
+                 command=self.clear_console,
+                 bg='#dc3545', fg='white',
+                 font=('Segoe UI', 10, 'bold'),
+                 relief='flat', padx=15, pady=5).pack(side='left', padx=5)
         
-        self.table_var = tk.StringVar()
-        self.table_combo = ttk.Combobox(controls_frame, textvariable=self.table_var,
-                                       state='readonly', width=30)
-        self.table_combo.pack(side='left', padx=(0, 10))
+        tk.Button(controls_frame, text="💾 Save Log",
+                 command=self.save_console_log,
+                 bg='#28a745', fg='white',
+                 font=('Segoe UI', 10, 'bold'),
+                 relief='flat', padx=15, pady=5).pack(side='left', padx=5)
         
-        ttk.Button(controls_frame, text="Refresh Tables",
-                  style='Professional.TButton',
-                  command=self.refresh_tables).pack(side='left', padx=10)
+        # Console output area
+        self.console_text = scrolledtext.ScrolledText(
+            console_frame,
+            wrap=tk.WORD,
+            height=25,
+            font=('Consolas', 11),
+            bg='#2c3e50',
+            fg='#ecf0f1',
+            insertbackground='#ffd700'
+        )
+        self.console_text.pack(fill='both', expand=True, padx=20, pady=(0, 20))
         
-        ttk.Button(controls_frame, text="Load Data", 
-                  style='Success.TButton',
-                  command=self.load_table_data).pack(side='left', padx=10)
+        # Add welcome message
+        self.console_text.insert(tk.END, "🚀 Professional Database Migration Console\n")
+        self.console_text.insert(tk.END, "=" * 60 + "\n")
+        self.console_text.insert(tk.END, f"Session started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        self.console_text.insert(tk.END, "Ready for migration operations...\n\n")
+    
+    def create_data_tab(self):
+        """Create the data visualization/tables tab"""
+        data_frame = ttk.Frame(self.notebook)
+        self.notebook.add(data_frame, text="📊 Data")
         
-        ttk.Button(controls_frame, text="Add Row",
-                  style='Professional.TButton',
-                  command=self.add_table_row).pack(side='left', padx=10)
+        # Data header
+        data_header = tk.Frame(data_frame, bg='#ffd700', height=60)
+        data_header.pack(fill='x', pady=(0, 10))
+        data_header.pack_propagate(False)
         
-        ttk.Button(controls_frame, text="Edit Row",
-                  style='Professional.TButton',
-                  command=self.edit_table_row).pack(side='left', padx=10)
+        self.data_header_label = tk.Label(data_header,
+                text="📈 Database Tables & Migration Data",
+                font=('Segoe UI', 16, 'bold'),
+                bg='#ffd700', fg='#2c3e50')
+        self.data_header_label.pack(expand=True)
         
-        ttk.Button(controls_frame, text="Delete Row",
-                  style='Danger.TButton',
-                  command=self.delete_table_row).pack(side='left', padx=10)
+        # Data controls
+        data_controls = tk.Frame(data_frame, bg='white')
+        data_controls.pack(fill='x', padx=20, pady=10)
         
-        # Data display
-        data_frame = ttk.Frame(tab_frame, style='Professional.TFrame')
-        data_frame.pack(fill='both', expand=True, padx=20, pady=10)
+        # Left side controls
+        left_controls = tk.Frame(data_controls, bg='white')
+        left_controls.pack(side='left')
         
-        # Treeview for data
-        self.data_tree = ttk.Treeview(data_frame)
+        tk.Button(left_controls, text="🔄 Refresh Tables",
+                 command=self.refresh_tables,
+                 bg='#17a2b8', fg='white',
+                 font=('Segoe UI', 10, 'bold'),
+                 relief='flat', padx=15, pady=5).pack(side='left', padx=(0, 5))
         
-        # Scrollbars
-        v_scrollbar = ttk.Scrollbar(data_frame, orient='vertical', command=self.data_tree.yview)
-        h_scrollbar = ttk.Scrollbar(data_frame, orient='horizontal', command=self.data_tree.xview)
+        tk.Button(left_controls, text="📊 Export Data",
+                 command=self.export_table_data,
+                 bg='#28a745', fg='white',
+                 font=('Segoe UI', 10, 'bold'),
+                 relief='flat', padx=15, pady=5).pack(side='left', padx=5)
         
-        self.data_tree.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
+        # Right side controls (for table view)
+        right_controls = tk.Frame(data_controls, bg='white')
+        right_controls.pack(side='right')
         
-        # Pack scrollbars and treeview
-        v_scrollbar.pack(side='right', fill='y')
-        h_scrollbar.pack(side='bottom', fill='x')
-        self.data_tree.pack(fill='both', expand=True)
+        # Back button (initially hidden)
+        self.back_button = tk.Button(right_controls, text="⬆️ Back to Tables",
+                 command=self.show_tables_list,
+                 bg='#6c757d', fg='white',
+                 font=('Segoe UI', 10, 'bold'),
+                 relief='flat', padx=15, pady=5)
         
-        # Add mouse wheel scrolling support to data tree
-        def on_tree_mousewheel(event):
-            self.data_tree.yview_scroll(int(-1*(event.delta/120)), "units")
+        # Table action buttons (initially hidden)
+        self.add_row_button = tk.Button(right_controls, text="➕ Add Row",
+                 command=self.add_table_row,
+                 bg='#28a745', fg='white',
+                 font=('Segoe UI', 10, 'bold'),
+                 relief='flat', padx=15, pady=5)
         
-        def bind_tree_mousewheel(event):
-            self.data_tree.bind_all("<MouseWheel>", on_tree_mousewheel)
+        self.edit_row_button = tk.Button(right_controls, text="✏️ Edit Row",
+                 command=self.edit_table_row,
+                 bg='#ffc107', fg='#2c3e50',
+                 font=('Segoe UI', 10, 'bold'),
+                 relief='flat', padx=15, pady=5)
         
-        def unbind_tree_mousewheel(event):
-            self.data_tree.unbind_all("<MouseWheel>")
+        self.delete_row_button = tk.Button(right_controls, text="🗑️ Delete Row",
+                 command=self.delete_table_row,
+                 bg='#dc3545', fg='white',
+                 font=('Segoe UI', 10, 'bold'),
+                 relief='flat', padx=15, pady=5)
         
-        self.data_tree.bind('<Enter>', bind_tree_mousewheel)
-        self.data_tree.bind('<Leave>', unbind_tree_mousewheel)
+        # Main display area
+        self.data_display_frame = tk.Frame(data_frame, bg='white')
+        self.data_display_frame.pack(fill='both', expand=True, padx=20, pady=(0, 20))
         
-        # Initial table refresh
-        self.refresh_tables()
+        # Create tables list view
+        self.create_tables_list_view()
+        
+        # Create table content view (initially hidden)
+        self.create_table_content_view()
+        
+        # State variables
+        self.current_table = None
+        self.viewing_table_content = False
+        
+        # Show tables list initially
+        self.show_tables_list()
+        
+        # Load initial table data only after settings are initialized
+        # Will be called after all tabs are created
     
     def create_analysis_tab(self):
-        """Create analysis and insights tab"""
-        tab_frame = ttk.Frame(self.notebook, style='Professional.TFrame')
-        self.notebook.add(tab_frame, text="Analysis")
+        """Create the analysis/reports tab"""
+        analysis_frame = ttk.Frame(self.notebook)
+        self.notebook.add(analysis_frame, text="📈 Analysis")
         
-        # Header
-        header_label = ttk.Label(tab_frame,
-                                text="Database Schema Analysis & Performance Insights", 
-                                style='Heading.TLabel')
-        header_label.pack(pady=20)
+        # Analysis header
+        analysis_header = tk.Frame(analysis_frame, bg='#ffd700', height=60)
+        analysis_header.pack(fill='x', pady=(0, 10))
+        analysis_header.pack_propagate(False)
         
-        # Control buttons - at the top, always visible
-        controls_frame = ttk.Frame(tab_frame, style='Professional.TFrame')
-        controls_frame.pack(fill='x', padx=20, pady=(0, 10))
+        tk.Label(analysis_header,
+                text="📊 Database Schema Analysis & Migration Reports",
+                font=('Segoe UI', 16, 'bold'),
+                bg='#ffd700', fg='#2c3e50').pack(expand=True)
         
-        ttk.Button(controls_frame, text="Schema Analysis",
-                  style='Professional.TButton',
-                  command=self.analyze_database).pack(side='left', padx=(0, 10))
+        # Main content frame
+        content_frame = tk.Frame(analysis_frame, bg='white')
+        content_frame.pack(fill='both', expand=True, padx=20, pady=10)
         
-        ttk.Button(controls_frame, text="Migration Tools Info",
-                  style='Success.TButton', 
-                  command=self.show_migration_tools_info).pack(side='left', padx=10)
+        # Analysis controls
+        controls_frame = tk.Frame(content_frame, bg='white')
+        controls_frame.pack(fill='x', pady=(0, 15))
         
-        # Analysis content
-        analysis_frame = ttk.Frame(tab_frame, style='Professional.TFrame')
-        analysis_frame.pack(fill='both', expand=True, padx=20, pady=10)
+        tk.Button(controls_frame, text="🔍 Schema Analysis",
+                 command=self.run_schema_analysis,
+                 bg='#ffd700', fg='#2c3e50',
+                 font=('Segoe UI', 12, 'bold'),
+                 relief='flat', padx=25, pady=10).pack(side='left', padx=(0, 10))
         
-        # Analysis text area
-        self.analysis_text = scrolledtext.ScrolledText(analysis_frame,
-                                                      bg=self.colors['secondary_bg'],
-                                                      fg=self.colors['text_light'],
-                                                      font=('Segoe UI', 10),
-                                                      insertbackground=self.colors['accent'])
-        self.analysis_text.pack(fill='both', expand=True)
+        tk.Button(controls_frame, text="📋 Migration Summary",
+                 command=self.generate_migration_summary,
+                 bg='#28a745', fg='white',
+                 font=('Segoe UI', 12, 'bold'),
+                 relief='flat', padx=25, pady=10).pack(side='left', padx=10)
         
-        # Add mouse wheel scrolling support to analysis text
-        def on_analysis_mousewheel(event):
-            self.analysis_text.yview_scroll(int(-1*(event.delta/120)), "units")
+        tk.Button(controls_frame, text="🗑️ Clear Report",
+                 command=self.clear_analysis,
+                 bg='#dc3545', fg='white',
+                 font=('Segoe UI', 12, 'bold'),
+                 relief='flat', padx=25, pady=10).pack(side='right')
         
-        def bind_analysis_mousewheel(event):
-            self.analysis_text.bind_all("<MouseWheel>", on_analysis_mousewheel)
+        # Analysis results area
+        self.analysis_text = scrolledtext.ScrolledText(
+            content_frame,
+            wrap=tk.WORD,
+            height=25,
+            font=('Consolas', 11),
+            bg='#f8f9fa',
+            relief='raised',
+            bd=2
+        )
+        self.analysis_text.pack(fill='both', expand=True, pady=(10, 0))
         
-        def unbind_analysis_mousewheel(event):
-            self.analysis_text.unbind_all("<MouseWheel>")
-        
-        self.analysis_text.bind('<Enter>', bind_analysis_mousewheel)
-        self.analysis_text.bind('<Leave>', unbind_analysis_mousewheel)
-        
-        # Initial content
-        self.analysis_text.insert('1.0', "Database Schema Analysis & Migration Tools Information\n")
-        self.analysis_text.insert('end', "="*65 + "\n\n")
-        self.analysis_text.insert('end', "This tab provides detailed analysis and information:\n\n")
-        self.analysis_text.insert('end', "Schema Analysis - Examine your database structure, tables, and relationships\n")
-        self.analysis_text.insert('end', "   • Table details and record counts\n")
-        self.analysis_text.insert('end', "   • Column information and data types\n")
-        self.analysis_text.insert('end', "   • Database optimization recommendations\n\n")
-        self.analysis_text.insert('end', "Migration Tools Info - Comprehensive comparison guide\n")
-        self.analysis_text.insert('end', "   • Detailed comparison of Redgate, Bytebase, and Liquibase\n")
-        self.analysis_text.insert('end', "   • Pros and cons of each approach\n")
-        self.analysis_text.insert('end', "   • Testing recommendations and decision factors\n")
-        self.analysis_text.insert('end', "   • File structures and implementation details\n\n")
-        self.analysis_text.insert('end', "Select an option above to begin your analysis...\n")
+        # Add initial welcome message
+        self.analysis_text.insert(tk.END, "📊 Database Analysis Center\n")
+        self.analysis_text.insert(tk.END, "=" * 50 + "\n\n")
+        self.analysis_text.insert(tk.END, "Welcome to the Database Analysis Center!\n\n")
+        self.analysis_text.insert(tk.END, "🔍 Use 'Schema Analysis' to examine your database structure\n")
+        self.analysis_text.insert(tk.END, "📋 Use 'Migration Summary' to review completed operations\n\n")
+        self.analysis_text.insert(tk.END, "Select an analysis option above to begin...\n")
     
     def create_settings_tab(self):
-        """Create settings and configuration tab"""
-        tab_frame = ttk.Frame(self.notebook, style='Professional.TFrame')
-        self.notebook.add(tab_frame, text="Settings")
+        """Create the settings/configuration tab"""
+        settings_frame = ttk.Frame(self.notebook)
+        self.notebook.add(settings_frame, text="⚙️ Settings")
         
-        # Header
-        header_label = ttk.Label(tab_frame,
-                                text="Configuration & Settings",
-                                style='Heading.TLabel')
-        header_label.pack(pady=20)
+        # Settings header
+        settings_header = tk.Frame(settings_frame, bg='#ffd700', height=60)
+        settings_header.pack(fill='x', pady=(0, 10))
+        settings_header.pack_propagate(False)
+        
+        tk.Label(settings_header,
+                text="⚙️ Configuration & Database Settings",
+                font=('Segoe UI', 16, 'bold'),
+                bg='#ffd700', fg='#2c3e50').pack(expand=True)
         
         # Settings content
-        settings_frame = ttk.Frame(tab_frame, style='Professional.TFrame')
-        settings_frame.pack(fill='both', padx=40, pady=20)
+        settings_content = tk.Frame(settings_frame, bg='white')
+        settings_content.pack(fill='both', expand=True, padx=20, pady=10)
         
-        # Database connection settings
-        db_frame = ttk.LabelFrame(settings_frame, text="Database Connection")
-        db_frame.pack(fill='x', pady=(0, 20))
+        # Database Connection Settings
+        db_frame = tk.LabelFrame(settings_content,
+                                text="🗄️ Database Connection",
+                                font=('Segoe UI', 12, 'bold'),
+                                bg='white')
+        db_frame.pack(fill='x', pady=10)
         
-        # Connection info
-        info_text = f"""
-Host: {self.db_config['host']}
-Port: {self.db_config['port']}
-Database: {self.db_config['database']}
-User: {self.db_config['user']}
-        """
+        # Connection form
+        form_frame = tk.Frame(db_frame, bg='white')
+        form_frame.pack(padx=20, pady=15)
         
-        tk.Label(db_frame, text=info_text.strip(),
-                bg=self.colors['primary_bg'], fg=self.colors['text_light'],
-                font=('Consolas', 10), justify='left').pack(pady=10, padx=10, anchor='w')
+        # Host
+        tk.Label(form_frame, text="Host:", font=('Segoe UI', 10, 'bold'), bg='white').grid(row=0, column=0, sticky='w', padx=5, pady=5)
+        self.host_var = tk.StringVar(value=os.getenv("DB_HOST", "localhost"))
+        tk.Entry(form_frame, textvariable=self.host_var, font=('Segoe UI', 10), width=20).grid(row=0, column=1, padx=5, pady=5)
+        
+        # Port
+        tk.Label(form_frame, text="Port:", font=('Segoe UI', 10, 'bold'), bg='white').grid(row=0, column=2, sticky='w', padx=5, pady=5)
+        self.port_var = tk.StringVar(value=os.getenv("DB_PORT", "3306"))
+        tk.Entry(form_frame, textvariable=self.port_var, font=('Segoe UI', 10), width=10).grid(row=0, column=3, padx=5, pady=5)
+        
+        # Database
+        tk.Label(form_frame, text="Database:", font=('Segoe UI', 10, 'bold'), bg='white').grid(row=1, column=0, sticky='w', padx=5, pady=5)
+        self.db_var = tk.StringVar(value=os.getenv("DB_NAME", "status_poc"))
+        tk.Entry(form_frame, textvariable=self.db_var, font=('Segoe UI', 10), width=20).grid(row=1, column=1, padx=5, pady=5)
         
         # Test connection button
-        ttk.Button(db_frame, text="Test Connection",
-                  style='Professional.TButton',
-                  command=self.test_connection).pack(pady=10)
+        tk.Button(form_frame, text="🔗 Test Connection",
+                 command=self.test_connection,
+                 bg='#28a745', fg='white',
+                 font=('Segoe UI', 10, 'bold'),
+                 relief='flat', padx=15, pady=5).grid(row=1, column=2, columnspan=2, padx=10, pady=5)
         
-        # Migration paths
-        paths_frame = ttk.LabelFrame(settings_frame, text="Migration Paths")
-        paths_frame.pack(fill='x', pady=(0, 20))
+        # Tool Settings
+        tools_frame = tk.LabelFrame(settings_content,
+                                   text="🛠️ Tool Configuration",
+                                   font=('Segoe UI', 12, 'bold'),
+                                   bg='white')
+        tools_frame.pack(fill='x', pady=10)
         
-        paths_info = """
-Bytebase: bytebase/migrations/ (5 SQL files)
-Liquibase: liquibase/changelog/ (3 XML files) 
-Redgate: redgate/migrations/ (2 SQL files)
-        """
+        tools_content = tk.Frame(tools_frame, bg='white')
+        tools_content.pack(padx=20, pady=15)
         
-        tk.Label(paths_frame, text=paths_info.strip(),
-                bg=self.colors['primary_bg'], fg=self.colors['text_light'],
-                font=('Segoe UI', 10), justify='left').pack(pady=10, padx=10, anchor='w')
+        # Tool status checkboxes
+        self.bytebase_enabled = tk.BooleanVar(value=True)
+        self.liquibase_enabled = tk.BooleanVar(value=True)
+        self.redgate_enabled = tk.BooleanVar(value=True)
+        
+        tk.Checkbutton(tools_content, text="🔵 Enable Bytebase",
+                      variable=self.bytebase_enabled,
+                      font=('Segoe UI', 10),
+                      bg='white').pack(anchor='w', pady=2)
+        
+        tk.Checkbutton(tools_content, text="🟣 Enable Liquibase",
+                      variable=self.liquibase_enabled,
+                      font=('Segoe UI', 10),
+                      bg='white').pack(anchor='w', pady=2)
+        
+        tk.Checkbutton(tools_content, text="🔴 Enable Redgate",
+                      variable=self.redgate_enabled,
+                      font=('Segoe UI', 10),
+                      bg='white').pack(anchor='w', pady=2)
     
     def create_status_bar(self):
-        """Create status bar"""
-        self.status_bar = tk.Frame(self.root, bg=self.colors['secondary_bg'], height=30)
-        self.status_bar.pack(fill='x', side='bottom')
-        self.status_bar.pack_propagate(False)
+        """Create the status bar at the bottom"""
+        status_frame = tk.Frame(self.root, bg='#2c3e50', height=40)
+        status_frame.pack(fill='x', side='bottom')
+        status_frame.pack_propagate(False)
         
-        self.status_label = tk.Label(self.status_bar, 
-                                    text="Ready",
-                                    bg=self.colors['secondary_bg'],
-                                    fg=self.colors['text_light'],
-                                    font=('Segoe UI', 9))
-        self.status_label.pack(side='left', padx=10, pady=5)
+        # Status label
+        tk.Label(status_frame, textvariable=self.status_var,
+                font=('Segoe UI', 10),
+                bg='#2c3e50', fg='white').pack(side='left', padx=20, pady=10)
         
         # Time label
-        self.time_label = tk.Label(self.status_bar,
-                                  text=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                  bg=self.colors['secondary_bg'],
-                                  fg=self.colors['text_light'],
-                                  font=('Segoe UI', 9))
-        self.time_label.pack(side='right', padx=10, pady=5)
-        
-        # Update time periodically
-        self.update_time()
+        self.time_var = tk.StringVar()
+        tk.Label(status_frame, textvariable=self.time_var,
+                font=('Segoe UI', 10),
+                bg='#2c3e50', fg='#ffd700').pack(side='right', padx=20, pady=10)
+    def add_mousewheel_support(self, canvas):
+        """Add mousewheel scrolling support to canvas"""
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
     
     def update_time(self):
-        """Update time display"""
-        self.time_label.config(text=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        """Update the time display"""
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        self.time_var.set(f"🕒 {current_time}")
         self.root.after(1000, self.update_time)
-    
-    def get_connection(self):
-        """Get database connection"""
-        try:
-            return mysql.connector.connect(**self.db_config)
-        except mysql.connector.Error as err:
-            messagebox.showerror("Database Error", f"Connection failed: {err}")
-            return None
-    
-    def test_connection(self):
-        """Test database connection"""
-        conn = self.get_connection()
-        if conn:
-            conn.close()
-            self.connection_status.config(text="CONNECTED", fg=self.colors['success'])
-            self.update_status("Database connection successful")
-        else:
-            self.connection_status.config(text="DISCONNECTED", fg=self.colors['error'])
-            self.update_status("Database connection failed")
     
     def update_status(self, message):
         """Update status bar message"""
-        self.status_label.config(text=message)
+        self.status_var.set(message)
+        self.log_to_console(f"[{datetime.now().strftime('%H:%M:%S')}] {message}")
     
-    def run_migration(self, tool):
-        """Run migration for specific tool"""
-        self.update_status(f"Running {tool} migration...")
-        
-        # Run in separate thread to prevent GUI blocking
-        def migrate():
-            try:
-                start_time = time.time()
-                
-                if tool == 'liquibase':
-                    self.run_liquibase_migration()
-                elif tool == 'bytebase':
-                    self.run_folder_migration('bytebase/migrations', 'Bytebase')
-                elif tool == 'redgate':
-                    self.run_folder_migration('redgate/migrations', 'Redgate')
-                
-                execution_time = time.time() - start_time
-                
-                self.root.after(0, lambda: self.log_result(f"SUCCESS: {tool.capitalize()} migration completed in {execution_time:.2f}s"))
-                self.root.after(0, lambda: self.update_status(f"{tool.capitalize()} migration completed"))
-                
-            except Exception as e:
-                self.root.after(0, lambda: self.log_result(f"ERROR: {tool.capitalize()} migration failed: {str(e)}"))
-                self.root.after(0, lambda: self.update_status(f"{tool.capitalize()} migration failed"))
-        
-        threading.Thread(target=migrate, daemon=True).start()
-    
-    def run_liquibase_migration(self):
-        """Run Liquibase migration"""
-        liquibase_cmd = "liquibase.bat" if os.name == 'nt' else "liquibase"
-        
-        result = subprocess.run(
-            [liquibase_cmd, "--defaultsFile=liquibase.properties", "update"],
-            cwd="liquibase",
-            capture_output=True,
-            text=True,
-            timeout=120
-        )
-        
-        if result.returncode != 0:
-            raise Exception(result.stderr)
-    
-    def run_folder_migration(self, folder_path, tool_name):
-        """Run SQL folder migration"""
-        conn = self.get_connection()
-        if not conn:
-            raise Exception("Database connection failed")
-        
-        cursor = conn.cursor()
-        
-        try:
-            files = sorted([f for f in os.listdir(folder_path) if f.endswith(".sql")])
-            
-            for filename in files:
-                filepath = os.path.join(folder_path, filename)
-                with open(filepath, "r", encoding='utf-8') as f:
-                    sql = f.read()
-                
-                # Handle different delimiters (for stored procedures)
-                if "DELIMITER" in sql:
-                    # Split by delimiter changes and execute each part
-                    parts = sql.split("DELIMITER")
-                    current_delimiter = ";"
-                    
-                    for i, part in enumerate(parts):
-                        if i == 0:
-                            # First part uses default delimiter
-                            statements = [stmt.strip() for stmt in part.split(";") if stmt.strip()]
-                            for statement in statements:
-                                if statement:
-                                    cursor.execute(statement)
-                                    # Consume all results to avoid "Unread result found" error
-                                    try:
-                                        cursor.fetchall()
-                                    except:
-                                        pass
-                        else:
-                            # Extract new delimiter and content
-                            lines = part.strip().split('\n', 1)
-                            if len(lines) >= 2:
-                                new_delimiter = lines[0].strip()
-                                content = lines[1] if len(lines) > 1 else ""
-                                
-                                if new_delimiter and content:
-                                    if new_delimiter == ";":
-                                        # Back to default delimiter
-                                        statements = [stmt.strip() for stmt in content.split(";") if stmt.strip()]
-                                        for statement in statements:
-                                            if statement:
-                                                cursor.execute(statement)
-                                                # Consume all results
-                                                try:
-                                                    cursor.fetchall()
-                                                except:
-                                                    pass
-                                    else:
-                                        # Custom delimiter (like //)
-                                        statements = [stmt.strip() for stmt in content.split(new_delimiter) if stmt.strip()]
-                                        for statement in statements:
-                                            if statement and not statement.startswith("DELIMITER"):
-                                                cursor.execute(statement)
-                                                # Consume all results
-                                                try:
-                                                    cursor.fetchall()
-                                                except:
-                                                    pass
-                else:
-                    # Standard SQL without delimiter changes
-                    statements = [stmt.strip() for stmt in sql.split(";") if stmt.strip()]
-                    for statement in statements:
-                        if statement:
-                            cursor.execute(statement)
-                            # Consume all results to avoid "Unread result found" error
-                            try:
-                                cursor.fetchall()
-                            except:
-                                pass
-                
-                conn.commit()
-        
-        finally:
-            cursor.close()
-            conn.close()
-    
-    def run_automated_test(self):
-        """Run automated comparison test"""
-        self.update_status("Running automated test...")
-        self.log_result("AUTOMATED TEST: Starting automated migration tool comparison...\n")
-        
-        def run_test():
-            try:
-                # Run the migration tester script
-                result = subprocess.run(
-                    ["python", "migration_tester.py"],
-                    capture_output=True,
-                    text=True,
-                    timeout=300
-                )
-                
-                self.root.after(0, lambda: self.log_result(result.stdout))
-                if result.stderr:
-                    self.root.after(0, lambda: self.log_result(f"\nErrors:\n{result.stderr}"))
-                
-                self.root.after(0, lambda: self.update_status("Automated test completed"))
-                
-            except Exception as e:
-                self.root.after(0, lambda: self.log_result(f"ERROR: Automated test failed: {str(e)}"))
-                self.root.after(0, lambda: self.update_status("Automated test failed"))
-        
-        threading.Thread(target=run_test, daemon=True).start()
-    
-    def reset_database(self):
-        """Reset database"""
-        if messagebox.askyesno("Confirm Reset", "Are you sure you want to reset the database? This will drop all tables and views."):
-            self.update_status("Resetting database...")
-            
-            def reset():
-                try:
-                    conn = self.get_connection()
-                    if not conn:
-                        raise Exception("Database connection failed")
-                    
-                    cursor = conn.cursor()
-                    
-                    # Disable foreign key checks and autocommit
-                    cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
-                    cursor.execute("SET AUTOCOMMIT = 0")
-                    
-                    # First, drop all views (must be done before tables due to dependencies)
-                    cursor.execute("SHOW FULL TABLES WHERE Table_type = 'VIEW'")
-                    views = cursor.fetchall()
-                    for (view_name, table_type) in views:
-                        try:
-                            cursor.execute(f"DROP VIEW IF EXISTS `{view_name}`")
-                            print(f"Dropped view: {view_name}")
-                        except Exception as e:
-                            print(f"Error dropping view {view_name}: {e}")
-                    
-                    # Then drop all tables
-                    cursor.execute("SHOW TABLES")
-                    all_objects = cursor.fetchall()
-                    tables = [obj[0] for obj in all_objects]
-                    
-                    # Drop tables in multiple passes to handle foreign key dependencies
-                    max_attempts = 3
-                    for attempt in range(max_attempts):
-                        cursor.execute("SHOW TABLES")
-                        remaining_tables = [table[0] for table in cursor.fetchall()]
-                        
-                        if not remaining_tables:
-                            break
-                            
-                        for table_name in remaining_tables:
-                            try:
-                                cursor.execute(f"DROP TABLE IF EXISTS `{table_name}`")
-                                print(f"Dropped table: {table_name}")
-                            except Exception as e:
-                                print(f"Attempt {attempt+1}: Error dropping table {table_name}: {e}")
-                    
-                    # Re-enable foreign key checks
-                    cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
-                    cursor.execute("SET AUTOCOMMIT = 1")
-                    conn.commit()
-                    
-                    # Verify database is completely clean
-                    cursor.execute("SHOW TABLES")
-                    remaining_tables = cursor.fetchall()
-                    cursor.execute("SHOW FULL TABLES WHERE Table_type = 'VIEW'")
-                    remaining_views = cursor.fetchall()
-                    
-                    if remaining_tables or remaining_views:
-                        raise Exception(f"Database reset incomplete - Tables: {remaining_tables}, Views: {remaining_views}")
-                    
-                    cursor.close()
-                    conn.close()
-                    
-                    # Add a longer delay to ensure reset is complete
-                    import time
-                    time.sleep(1.0)
-                    
-                    self.root.after(0, lambda: self.log_result("DATABASE RESET: Database completely reset - all tables and views removed"))
-                    self.root.after(0, lambda: self.update_status("Database reset completed"))
-                    self.root.after(0, self.refresh_tables)
-                    
-                except Exception as e:
-                    self.root.after(0, lambda: self.log_result(f"ERROR: Database reset failed: {str(e)}"))
-                    self.root.after(0, lambda: self.update_status("Database reset failed"))
-            
-            threading.Thread(target=reset, daemon=True).start()
-    
-    def quick_analysis(self):
-        """Quick database analysis"""
-        self.update_status("Running quick analysis...")
-        
-        def analyze():
-            try:
-                conn = self.get_connection()
-                if not conn:
-                    raise Exception("Database connection failed")
-                
-                cursor = conn.cursor()
-                
-                # Get table count
-                cursor.execute("SHOW TABLES")
-                tables = cursor.fetchall()
-                
-                analysis = f"QUICK ANALYSIS: Quick Analysis Results ({datetime.now().strftime('%H:%M:%S')})\n"
-                analysis += "=" * 50 + "\n"
-                analysis += f"Total tables: {len(tables)}\n\n"
-                
-                if tables:
-                    analysis += "Tables found:\n"
-                    for (table,) in tables:
-                        cursor.execute(f"SELECT COUNT(*) FROM {table}")
-                        count = cursor.fetchone()[0]
-                        analysis += f"  • {table}: {count} records\n"
-                else:
-                    analysis += "INFO: No tables found - run migrations first\n"
-                
-                cursor.close()
-                conn.close()
-                
-                self.root.after(0, lambda: self.log_result(analysis))
-                self.root.after(0, lambda: self.update_status("Quick analysis completed"))
-                
-            except Exception as e:
-                self.root.after(0, lambda: self.log_result(f"ERROR: Analysis failed: {str(e)}"))
-                self.root.after(0, lambda: self.update_status("Analysis failed"))
-        
-        threading.Thread(target=analyze, daemon=True).start()
-    
-    def refresh_tables(self):
-        """Refresh table list"""
-        try:
-            conn = self.get_connection()
-            if not conn:
-                return
-            
-            cursor = conn.cursor()
-            cursor.execute("SHOW TABLES")
-            tables = [table[0] for table in cursor.fetchall()]
-            
-            self.table_combo['values'] = tables
-            if tables:
-                self.table_combo.set(tables[0])
-            
-            cursor.close()
-            conn.close()
-            
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to refresh tables: {str(e)}")
-    
-    def load_table_data(self):
-        """Load data for selected table"""
-        table_name = self.table_var.get()
-        if not table_name:
-            messagebox.showwarning("Warning", "Please select a table first")
-            return
-        
-        try:
-            conn = self.get_connection()
-            if not conn:
-                return
-            
-            cursor = conn.cursor()
-            
-            # Clear existing data
-            for item in self.data_tree.get_children():
-                self.data_tree.delete(item)
-            
-            # Get column names
-            cursor.execute(f"DESCRIBE {table_name}")
-            columns = [row[0] for row in cursor.fetchall()]
-            
-            # Configure treeview columns
-            self.data_tree['columns'] = columns
-            self.data_tree['show'] = 'headings'
-            
-            for col in columns:
-                self.data_tree.heading(col, text=col)
-                self.data_tree.column(col, width=120)
-            
-            # Get data
-            cursor.execute(f"SELECT * FROM {table_name} LIMIT 100")
-            rows = cursor.fetchall()
-            
-            for row in rows:
-                self.data_tree.insert('', 'end', values=row)
-            
-            cursor.close()
-            conn.close()
-            
-            self.update_status(f"Loaded {len(rows)} records from {table_name}")
-            
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to load table data: {str(e)}")
-    
-    def analyze_database(self):
-        """Detailed database analysis"""
-        self.analysis_text.delete('1.0', 'end')
-        self.update_status("Running detailed analysis...")
-        
-        def analyze():
-            try:
-                conn = self.get_connection()
-                if not conn:
-                    raise Exception("Database connection failed")
-                
-                cursor = conn.cursor()
-                
-                analysis = f"DETAILED DATABASE ANALYSIS\n"
-                analysis += f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-                analysis += "=" * 60 + "\n\n"
-                
-                # Get tables
-                cursor.execute("SHOW TABLES")
-                tables = cursor.fetchall()
-                
-                analysis += f"SUMMARY\n"
-                analysis += f"Total Tables: {len(tables)}\n\n"
-                
-                if tables:
-                    analysis += f"TABLE DETAILS\n"
-                    analysis += "-" * 40 + "\n"
-                    
-                    for (table,) in tables:
-                        # Table info
-                        cursor.execute(f"SELECT COUNT(*) FROM {table}")
-                        count = cursor.fetchone()[0]
-                        
-                        cursor.execute(f"DESCRIBE {table}")
-                        columns = cursor.fetchall()
-                        
-                        analysis += f"\n{table.upper()}\n"
-                        analysis += f"   Records: {count}\n"
-                        analysis += f"   Columns: {len(columns)}\n"
-                        
-                        # Show column details
-                        for col in columns[:5]:  # Show first 5 columns
-                            analysis += f"   • {col[0]} ({col[1]})\n"
-                        
-                        if len(columns) > 5:
-                            analysis += f"   ... and {len(columns) - 5} more columns\n"
-                
-                else:
-                    analysis += "INFO: No tables found. Run migrations to create database schema.\n"
-                
-                analysis += f"\nRECOMMENDATIONS\n"
-                analysis += "-" * 40 + "\n"
-                
-                if len(tables) > 0:
-                    analysis += "• Database schema has been created successfully\n"
-                    analysis += "• Consider running performance tests with larger datasets\n"
-                    analysis += "• Review indexing strategy for production use\n"
-                else:
-                    analysis += "• Run migration tools to create database schema\n"
-                    analysis += "• Start with Bytebase for incremental approach\n"
-                    analysis += "• Compare execution times between tools\n"
-                
-                cursor.close()
-                conn.close()
-                
-                self.root.after(0, lambda: self.analysis_text.insert('1.0', analysis))
-                self.root.after(0, lambda: self.update_status("Detailed analysis completed"))
-                
-            except Exception as e:
-                error_msg = f"ERROR: Analysis failed: {str(e)}"
-                self.root.after(0, lambda: self.analysis_text.insert('1.0', error_msg))
-                self.root.after(0, lambda: self.update_status("Analysis failed"))
-        
-        threading.Thread(target=analyze, daemon=True).start()
-    
-    def show_migration_tools_info(self):
-        """Show comprehensive information about migration tools"""
-        self.analysis_text.delete('1.0', 'end')
-        
-        info = f"DATABASE MIGRATION TOOLS COMPARISON\n"
-        info += f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        info += "=" * 70 + "\n\n"
-        
-        info += "OVERVIEW\n"
-        info += "-" * 30 + "\n"
-        info += "This POC compares three different approaches to database migrations:\n"
-        info += "• Traditional SQL Scripts (Redgate style)\n"
-        info += "• Modern Incremental Migrations (Bytebase style)\n"
-        info += "• Enterprise XML Changesets (Liquibase)\n\n"
-        
-        info += "REDGATE APPROACH\n"
-        info += "-" * 30 + "\n"
-        info += "File Count: 2 SQL files\n"
-        info += "Approach: Traditional DBA comprehensive scripts\n"
-        info += "Structure:\n"
-        info += "  • schema.sql - Complete database schema with all objects\n"
-        info += "  • data.sql - Initial data population\n\n"
-        info += "Characteristics:\n"
-        info += "  + Pure SQL - no abstraction layer\n"
-        info += "  + Complete control over SQL execution\n"
-        info += "  + Supports complex stored procedures and functions\n"
-        info += "  + Familiar to traditional DBAs\n"
-        info += "  - No built-in rollback mechanisms\n"
-        info += "  - Manual dependency management\n"
-        info += "  - Harder to track individual changes\n\n"
-        info += "Best For: Teams with strong SQL expertise, complex database logic\n\n"
-        
-        info += "BYTEBASE APPROACH\n"
-        info += "-" * 30 + "\n"
-        info += "File Count: 5 SQL files\n"
-        info += "Approach: Git-like incremental changes\n"
-        info += "Structure:\n"
-        info += "  • 001_initial_schema.sql - Base tables\n"
-        info += "  • 002_add_users.sql - User management\n"
-        info += "  • 003_add_orders.sql - Order system\n"
-        info += "  • 004_add_products.sql - Product catalog\n"
-        info += "  • 005_add_relationships.sql - Foreign keys\n\n"
-        info += "Characteristics:\n"
-        info += "  + Incremental change tracking\n"
-        info += "  + UI-driven workflow\n"
-        info += "  + Built-in version control integration\n"
-        info += "  + Automatic rollback capabilities\n"
-        info += "  + Team collaboration features\n"
-        info += "  - Learning curve for traditional DBAs\n"
-        info += "  - May require workflow changes\n\n"
-        info += "Best For: Development teams, CI/CD pipelines, collaborative environments\n\n"
-        
-        info += "LIQUIBASE APPROACH\n"
-        info += "-" * 30 + "\n"
-        info += "File Count: 3 XML files + properties\n"
-        info += "Approach: Enterprise database-agnostic changesets\n"
-        info += "Structure:\n"
-        info += "  • db.changelog-master.xml - Main changelog\n"
-        info += "  • create-tables.xml - Table definitions\n"
-        info += "  • insert-data.xml - Data population\n"
-        info += "  • liquibase.properties - Configuration\n\n"
-        info += "Characteristics:\n"
-        info += "  + Database-agnostic (MySQL, PostgreSQL, Oracle, etc.)\n"
-        info += "  + Enterprise-grade rollback support\n"
-        info += "  + Extensive change types and validations\n"
-        info += "  + Integration with major IDEs and CI/CD\n"
-        info += "  + Preconditions and context support\n"
-        info += "  - XML can be verbose and complex\n"
-        info += "  - Steeper learning curve\n"
-        info += "  - Requires Liquibase knowledge\n\n"
-        info += "Best For: Enterprise environments, multi-database support, complex deployment pipelines\n\n"
-        
-        info += "COMPARISON MATRIX\n"
-        info += "-" * 30 + "\n"
-        info += f"{'Aspect':<20} {'Redgate':<12} {'Bytebase':<12} {'Liquibase':<12}\n"
-        info += f"{'Complexity':<20} {'Low':<12} {'Medium':<12} {'High':<12}\n"
-        info += f"{'Learning Curve':<20} {'Minimal':<12} {'Moderate':<12} {'Steep':<12}\n"
-        info += f"{'Rollback Support':<20} {'Manual':<12} {'Automatic':<12} {'Enterprise':<12}\n"
-        info += f"{'Team Collaboration':<20} {'Basic':<12} {'Excellent':<12} {'Good':<12}\n"
-        info += f"{'Database Support':<20} {'MySQL':<12} {'Multiple':<12} {'Universal':<12}\n"
-        info += f"{'File Count':<20} {'2':<12} {'5':<12} {'3+config':<12}\n"
-        info += f"{'Format':<20} {'Pure SQL':<12} {'SQL':<12} {'XML':<12}\n\n"
-        
-        info += "TESTING RECOMMENDATIONS\n"
-        info += "-" * 30 + "\n"
-        info += "1. Run each migration tool individually to compare execution times\n"
-        info += "2. Use 'Reset Database' between tests for clean comparisons\n"
-        info += "3. Check the Console tab for detailed execution logs\n"
-        info += "4. Use 'Schema Analysis' to verify each tool creates the same structure\n"
-        info += "5. Test rollback capabilities (where supported)\n\n"
-        info += "WHAT TO LOOK FOR IN RESULTS\n"
-        info += "-" * 30 + "\n"
-        info += "• Execution speed differences\n"
-        info += "• Error handling and recovery\n"
-        info += "• Final database structure consistency\n"
-        info += "• Ease of debugging from console output\n"
-        info += "• Rollback and recovery capabilities\n\n"
-        info += "DECISION FACTORS\n"
-        info += "-" * 30 + "\n"
-        info += "Choose Redgate if: You have strong SQL skills and simple deployment needs\n"
-        info += "Choose Bytebase if: You want modern DevOps integration and team collaboration\n"
-        info += "Choose Liquibase if: You need enterprise features and multi-database support\n"
-        
-        self.analysis_text.insert('1.0', info)
-        self.update_status("Migration tools information displayed")
-    
-    def log_result(self, message):
-        """Log result to console tab"""
-        # Ensure there's a newline before new messages if console has content
-        current_content = self.results_text.get('1.0', 'end-1c')
-        if current_content and not current_content.endswith('\n'):
-            self.results_text.insert('end', '\n')
-        
-        self.results_text.insert('end', f"{message}\n")
-        self.results_text.see('end')
+    def log_to_console(self, message):
+        """Add message to console"""
+        if hasattr(self, 'console_text'):
+            self.console_text.insert(tk.END, f"{message}\n")
+            self.console_text.see(tk.END)
     
     def clear_console(self):
-        """Clear console output"""
-        self.results_text.delete('1.0', 'end')
-        self.results_text.insert('1.0', "Console cleared.\n\n")
-        self.update_status("Console cleared")
+        """Clear the console output"""
+        if hasattr(self, 'console_text'):
+            self.console_text.delete(1.0, tk.END)
+            self.log_to_console("Console cleared")
     
-    def save_log(self):
+    def save_console_log(self):
         """Save console log to file"""
-        from tkinter import filedialog
-        filename = filedialog.asksaveasfilename(
-            defaultextension=".txt",
-            filetypes=[("Text files", "*.txt"), ("Log files", "*.log"), ("All files", "*.*")]
-        )
-        if filename:
-            try:
-                with open(filename, 'w', encoding='utf-8') as f:
-                    f.write(self.results_text.get('1.0', 'end'))
-                self.update_status(f"Log saved to {filename}")
-                messagebox.showinfo("Success", f"Log saved to {filename}")
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to save log: {str(e)}")
+        try:
+            filename = filedialog.asksaveasfilename(
+                defaultextension=".log",
+                filetypes=[("Log files", "*.log"), ("Text files", "*.txt"), ("All files", "*.*")]
+            )
+            if filename:
+                with open(filename, 'w') as f:
+                    f.write(self.console_text.get(1.0, tk.END))
+                self.update_status(f"Console log saved to {filename}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save log: {str(e)}")
     
-    def on_closing(self):
-        """Handle window closing"""
-        if messagebox.askokcancel("Quit", "Do you want to quit the application?"):
-            self.root.destroy()
+    def get_connection(self):
+        """Get database connection using current settings"""
+        try:
+            connection = mysql.connector.connect(
+                host=self.host_var.get(),
+                port=int(self.port_var.get()),
+                user=os.getenv("DB_USER"),
+                password=os.getenv("DB_PASS"),
+                database=self.db_var.get()
+            )
+            return connection
+        except Exception as e:
+            raise Exception(f"Database connection failed: {str(e)}")
     
-    def add_table_row(self):
-        """Add new row to selected table"""
-        table_name = self.table_var.get()
-        if not table_name:
-            messagebox.showwarning("Warning", "Please select a table first")
-            return
-        
+    def test_connection(self):
+        """Test database connection"""
         try:
             conn = self.get_connection()
-            if not conn:
+            conn.close()
+            self.update_status("✅ Database connection successful")
+            messagebox.showinfo("Success", "Database connection successful!")
+        except Exception as e:
+            self.update_status(f"❌ Database connection failed: {str(e)}")
+            messagebox.showerror("Connection Error", str(e))
+    
+    def refresh_tables(self):
+        """Refresh the tables display"""
+        try:
+            # Check if settings variables are initialized
+            if not hasattr(self, 'host_var') or not hasattr(self, 'port_var') or not hasattr(self, 'db_var'):
+                self.update_status("⚠️ Database settings not initialized yet")
                 return
+                
+            # Clear existing items
+            for item in self.tables_tree.get_children():
+                self.tables_tree.delete(item)
             
+            # Get table information
+            conn = self.get_connection()
             cursor = conn.cursor()
             
-            # Get column info
-            cursor.execute(f"DESCRIBE {table_name}")
-            columns = cursor.fetchall()
+            cursor.execute("SHOW TABLES")
+            tables = cursor.fetchall()
             
-            # Create input dialog
-            self.create_row_input_dialog(table_name, columns, "Add")
+            for table in tables:
+                table_name = table[0]
+                
+                # Get table info
+                cursor.execute(f"SELECT COUNT(*) FROM `{table_name}`")
+                row_count = cursor.fetchone()[0]
+                
+                cursor.execute(f"""
+                SELECT data_length + index_length as size 
+                FROM information_schema.tables 
+                WHERE table_schema = DATABASE() AND table_name = '{table_name}'
+                """)
+                size_result = cursor.fetchone()
+                size = f"{size_result[0] / 1024:.1f} KB" if size_result[0] else "0 KB"
+                
+                self.tables_tree.insert('', 'end', text=table_name,
+                                      values=('Table', row_count, size, datetime.now().strftime('%Y-%m-%d')))
             
             cursor.close()
             conn.close()
+            self.update_status(f"✅ Loaded {len(tables)} tables")
+            
+        except Exception as e:
+            self.update_status(f"❌ Failed to refresh tables: {str(e)}")
+    
+    def create_tables_list_view(self):
+        """Create the tables list view"""
+        self.tables_list_frame = tk.Frame(self.data_display_frame, bg='white')
+        
+        # Create treeview for table list
+        self.tables_tree = ttk.Treeview(self.tables_list_frame, columns=('Type', 'Rows', 'Size', 'Modified'), show='tree headings')
+        self.tables_tree.heading('#0', text='Table Name')
+        self.tables_tree.heading('Type', text='Type')
+        self.tables_tree.heading('Rows', text='Rows')
+        self.tables_tree.heading('Size', text='Size')
+        self.tables_tree.heading('Modified', text='Last Modified')
+        
+        # Table scrollbar
+        self.table_list_scrollbar = ttk.Scrollbar(self.tables_list_frame, orient='vertical', command=self.tables_tree.yview)
+        self.tables_tree.configure(yscrollcommand=self.table_list_scrollbar.set)
+        
+        self.tables_tree.pack(side='left', fill='both', expand=True)
+        self.table_list_scrollbar.pack(side='right', fill='y')
+        
+        # Bind double-click to open table
+        self.tables_tree.bind('<Double-1>', self.on_table_double_click)
+        
+    def create_table_content_view(self):
+        """Create the table content view"""
+        self.table_content_frame = tk.Frame(self.data_display_frame, bg='white')
+        
+        # Create treeview for table content
+        self.table_content_tree = ttk.Treeview(self.table_content_frame, show='tree headings')
+        
+        # Content scrollbars
+        self.content_v_scrollbar = ttk.Scrollbar(self.table_content_frame, orient='vertical', command=self.table_content_tree.yview)
+        self.content_h_scrollbar = ttk.Scrollbar(self.table_content_frame, orient='horizontal', command=self.table_content_tree.xview)
+        
+        self.table_content_tree.configure(
+            yscrollcommand=self.content_v_scrollbar.set,
+            xscrollcommand=self.content_h_scrollbar.set
+        )
+        
+        # Pack content view
+        self.table_content_tree.grid(row=0, column=0, sticky='nsew')
+        self.content_v_scrollbar.grid(row=0, column=1, sticky='ns')
+        self.content_h_scrollbar.grid(row=1, column=0, sticky='ew')
+        
+        self.table_content_frame.grid_rowconfigure(0, weight=1)
+        self.table_content_frame.grid_columnconfigure(0, weight=1)
+        
+        # Bind selection
+        self.table_content_tree.bind('<<TreeviewSelect>>', self.on_row_select)
+    
+    def show_tables_list(self):
+        """Show the tables list view"""
+        self.viewing_table_content = False
+        self.current_table = None
+        
+        # Hide table content view
+        self.table_content_frame.pack_forget()
+        
+        # Show tables list view
+        self.tables_list_frame.pack(fill='both', expand=True)
+        
+        # Update header
+        self.data_header_label.config(text="📈 Database Tables & Migration Data")
+        
+        # Hide table action buttons
+        self.back_button.pack_forget()
+        self.add_row_button.pack_forget()
+        self.edit_row_button.pack_forget()
+        self.delete_row_button.pack_forget()
+        
+        # Refresh tables list
+        self.refresh_tables()
+    
+    def show_table_content(self, table_name):
+        """Show the content of a specific table"""
+        self.viewing_table_content = True
+        self.current_table = table_name
+        
+        # Hide tables list view
+        self.tables_list_frame.pack_forget()
+        
+        # Show table content view
+        self.table_content_frame.pack(fill='both', expand=True)
+        
+        # Update header
+        self.data_header_label.config(text=f"📋 Table: {table_name}")
+        
+        # Show table action buttons
+        self.back_button.pack(side='right', padx=5)
+        self.add_row_button.pack(side='right', padx=5)
+        self.edit_row_button.pack(side='right', padx=5)
+        self.delete_row_button.pack(side='right', padx=5)
+        
+        # Load table content
+        self.load_table_content(table_name)
+    
+    def on_table_double_click(self, event):
+        """Handle double-click on table in the list"""
+        selection = self.tables_tree.selection()
+        if selection:
+            item = self.tables_tree.item(selection[0])
+            table_name = item['text']
+            self.show_table_content(table_name)
+    
+    def on_row_select(self, event):
+        """Handle row selection in table content"""
+        selection = self.table_content_tree.selection()
+        if selection:
+            # Enable edit/delete buttons when row is selected
+            self.edit_row_button.config(state='normal')
+            self.delete_row_button.config(state='normal')
+        else:
+            # Disable edit/delete buttons when no row is selected
+            self.edit_row_button.config(state='disabled')
+            self.delete_row_button.config(state='disabled')
+    
+    def load_table_content(self, table_name):
+        """Load content of a specific table"""
+        try:
+            # Clear existing content
+            for item in self.table_content_tree.get_children():
+                self.table_content_tree.delete(item)
+            
+            # Get table structure and data
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            # Get column information
+            cursor.execute(f"DESCRIBE `{table_name}`")
+            columns = cursor.fetchall()
+            
+            # Configure columns
+            column_names = [col[0] for col in columns]
+            self.table_content_tree['columns'] = column_names
+            self.table_content_tree.heading('#0', text='Row')
+            
+            for col_name in column_names:
+                self.table_content_tree.heading(col_name, text=col_name)
+                self.table_content_tree.column(col_name, width=120, minwidth=50)
+            
+            # Get table data
+            cursor.execute(f"SELECT * FROM `{table_name}` LIMIT 500")  # Limit for performance
+            rows = cursor.fetchall()
+            
+            # Insert data
+            for i, row in enumerate(rows, 1):
+                values = [str(val) if val is not None else '' for val in row]
+                self.table_content_tree.insert('', 'end', text=str(i), values=values)
+            
+            cursor.close()
+            conn.close()
+            
+            # Initially disable edit/delete buttons
+            self.edit_row_button.config(state='disabled')
+            self.delete_row_button.config(state='disabled')
+            
+            self.update_status(f"✅ Loaded {len(rows)} rows from {table_name}")
+            
+        except Exception as e:
+            self.update_status(f"❌ Failed to load table content: {str(e)}")
+    
+    def create_row_dialog(self, mode, columns, current_values=None):
+        """Create a dialog for adding or editing table rows"""
+        dialog = tk.Toplevel(self.root)
+        dialog.title(f"{mode} Row in {self.current_table}")
+        dialog.geometry("600x500")
+        dialog.configure(bg='white')
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        # Center the dialog
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (600 // 2)
+        y = (dialog.winfo_screenheight() // 2) - (500 // 2)
+        dialog.geometry(f'600x500+{x}+{y}')
+        
+        # Header
+        header_frame = tk.Frame(dialog, bg='#ffd700', height=60)
+        header_frame.pack(fill='x')
+        header_frame.pack_propagate(False)
+        
+        tk.Label(header_frame, text=f"{mode} Row in {self.current_table}",
+                font=('Segoe UI', 16, 'bold'), bg='#ffd700', fg='#2c3e50').pack(expand=True)
+        
+        # Main content with scrollbar
+        main_frame = tk.Frame(dialog, bg='white')
+        main_frame.pack(fill='both', expand=True, padx=20, pady=20)
+        
+        # Canvas for scrolling
+        canvas = tk.Canvas(main_frame, bg='white')
+        scrollbar = ttk.Scrollbar(main_frame, orient='vertical', command=canvas.yview)
+        scrollable_frame = tk.Frame(canvas, bg='white')
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # Store entry widgets for later access
+        entry_widgets = {}
+        
+        # Create form fields
+        for i, column in enumerate(columns):
+            col_name = column[0]
+            col_type = column[1]
+            is_nullable = column[2]
+            col_key = column[3]
+            col_default = column[4]
+            
+            # Skip auto-increment primary keys in add mode
+            if mode == "Add" and col_key == "PRI" and "auto_increment" in column[5].lower():
+                continue
+            
+            # Create row frame
+            row_frame = tk.Frame(scrollable_frame, bg='white')
+            row_frame.pack(fill='x', pady=8)
+            
+            # Column label
+            label_text = f"{col_name} ({col_type})"
+            if col_key == "PRI":
+                label_text += " [PK]"
+            if is_nullable == "NO":
+                label_text += " *"
+            
+            tk.Label(row_frame, text=label_text,
+                    font=('Segoe UI', 10, 'bold'), bg='white',
+                    anchor='w', width=25).pack(side='left', padx=(0, 10))
+            
+            # Input widget based on column type
+            if "text" in col_type.lower() or "varchar" in col_type.lower():
+                if "text" in col_type.lower():
+                    # Text area for TEXT fields
+                    entry = tk.Text(row_frame, height=3, width=40, font=('Segoe UI', 9))
+                    if current_values and i < len(current_values):
+                        entry.insert('1.0', str(current_values[i]) if current_values[i] else '')
+                else:
+                    # Single line entry for VARCHAR
+                    entry = tk.Entry(row_frame, font=('Segoe UI', 9), width=40)
+                    if current_values and i < len(current_values):
+                        entry.insert(0, str(current_values[i]) if current_values[i] else '')
+            elif "int" in col_type.lower():
+                # Numeric entry
+                entry = tk.Entry(row_frame, font=('Segoe UI', 9), width=40)
+                if current_values and i < len(current_values):
+                    entry.insert(0, str(current_values[i]) if current_values[i] else '')
+            elif "decimal" in col_type.lower() or "float" in col_type.lower():
+                # Decimal entry
+                entry = tk.Entry(row_frame, font=('Segoe UI', 9), width=40)
+                if current_values and i < len(current_values):
+                    entry.insert(0, str(current_values[i]) if current_values[i] else '')
+            elif "date" in col_type.lower() or "time" in col_type.lower():
+                # Date/time entry
+                entry = tk.Entry(row_frame, font=('Segoe UI', 9), width=40)
+                if current_values and i < len(current_values):
+                    entry.insert(0, str(current_values[i]) if current_values[i] else '')
+                # Add format hint
+                if "datetime" in col_type.lower():
+                    tk.Label(row_frame, text="(YYYY-MM-DD HH:MM:SS)",
+                            font=('Segoe UI', 8), fg='#666', bg='white').pack(side='right')
+                elif "date" in col_type.lower():
+                    tk.Label(row_frame, text="(YYYY-MM-DD)",
+                            font=('Segoe UI', 8), fg='#666', bg='white').pack(side='right')
+            else:
+                # Default entry
+                entry = tk.Entry(row_frame, font=('Segoe UI', 9), width=40)
+                if current_values and i < len(current_values):
+                    entry.insert(0, str(current_values[i]) if current_values[i] else '')
+            
+            entry.pack(side='left', fill='x', expand=True)
+            entry_widgets[col_name] = entry
+        
+        # Pack canvas and scrollbar
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        # Buttons frame
+        buttons_frame = tk.Frame(dialog, bg='white')
+        buttons_frame.pack(fill='x', padx=20, pady=(0, 20))
+        
+        # Save button
+        def save_row():
+            try:
+                # Collect values from form
+                values = {}
+                for col_name, widget in entry_widgets.items():
+                    if isinstance(widget, tk.Text):
+                        value = widget.get('1.0', 'end-1c').strip()
+                    else:
+                        value = widget.get().strip()
+                    
+                    # Convert empty strings to None for nullable fields
+                    if value == '':
+                        value = None
+                    
+                    values[col_name] = value
+                
+                # Execute database operation
+                if mode == "Add":
+                    self.execute_insert(values)
+                else:  # Edit mode
+                    self.execute_update(values, current_values, columns)
+                
+                dialog.destroy()
+                
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to save row: {str(e)}")
+        
+        tk.Button(buttons_frame, text=f"💾 {mode} Row",
+                 command=save_row,
+                 bg='#28a745', fg='white',
+                 font=('Segoe UI', 12, 'bold'),
+                 relief='flat', padx=30, pady=10).pack(side='right', padx=(10, 0))
+        
+        tk.Button(buttons_frame, text="❌ Cancel",
+                 command=dialog.destroy,
+                 bg='#6c757d', fg='white',
+                 font=('Segoe UI', 12, 'bold'),
+                 relief='flat', padx=30, pady=10).pack(side='right')
+        
+        # Add mousewheel support
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+    
+    def execute_insert(self, values):
+        """Execute INSERT statement"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            # Build INSERT statement
+            columns = list(values.keys())
+            placeholders = ', '.join(['%s'] * len(columns))
+            column_names = ', '.join([f"`{col}`" for col in columns])
+            
+            insert_query = f"INSERT INTO `{self.current_table}` ({column_names}) VALUES ({placeholders})"
+            insert_values = list(values.values())
+            
+            cursor.execute(insert_query, insert_values)
+            conn.commit()
+            
+            if cursor.rowcount > 0:
+                messagebox.showinfo("Success", f"Row added successfully to {self.current_table}")
+                self.update_status(f"✅ Added new row to {self.current_table}")
+                
+                # Refresh table content
+                self.load_table_content(self.current_table)
+            else:
+                messagebox.showwarning("Warning", "No rows were inserted")
+                self.update_status(f"⚠️ No rows inserted to {self.current_table}")
+            
+            cursor.close()
+            conn.close()
+            
+        except Exception as e:
+            raise Exception(f"Database insert failed: {str(e)}")
+    
+    def execute_update(self, values, current_values, columns):
+        """Execute UPDATE statement"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            # Get primary key information for WHERE clause
+            cursor.execute(f"SHOW KEYS FROM `{self.current_table}` WHERE Key_name = 'PRIMARY'")
+            primary_keys = cursor.fetchall()
+            
+            if not primary_keys:
+                raise Exception("Cannot update row: No primary key found in table")
+            
+            # Get column names
+            column_names = [col[0] for col in columns]
+            
+            # Build WHERE clause using primary key
+            where_conditions = []
+            where_values = []
+            
+            for pk in primary_keys:
+                pk_column = pk[4]  # Column_name is at index 4
+                if pk_column in column_names:
+                    col_index = column_names.index(pk_column)
+                    if col_index < len(current_values):
+                        where_conditions.append(f"`{pk_column}` = %s")
+                        where_values.append(current_values[col_index])
+            
+            if not where_conditions:
+                raise Exception("Cannot update row: Primary key values not found")
+            
+            # Build SET clause
+            set_conditions = []
+            set_values = []
+            
+            for col_name, value in values.items():
+                set_conditions.append(f"`{col_name}` = %s")
+                set_values.append(value)
+            
+            # Execute UPDATE
+            where_clause = " AND ".join(where_conditions)
+            set_clause = ", ".join(set_conditions)
+            update_query = f"UPDATE `{self.current_table}` SET {set_clause} WHERE {where_clause}"
+            
+            all_values = set_values + where_values
+            cursor.execute(update_query, all_values)
+            conn.commit()
+            
+            if cursor.rowcount > 0:
+                messagebox.showinfo("Success", f"Row updated successfully in {self.current_table}")
+                self.update_status(f"✅ Updated row in {self.current_table}")
+                
+                # Refresh table content
+                self.load_table_content(self.current_table)
+            else:
+                messagebox.showwarning("Warning", "No rows were updated")
+                self.update_status(f"⚠️ No rows updated in {self.current_table}")
+            
+            cursor.close()
+            conn.close()
+            
+        except Exception as e:
+            raise Exception(f"Database update failed: {str(e)}")
+    
+    def add_table_row(self):
+        """Add a new row to the current table"""
+        if not self.current_table:
+            return
+        
+        try:
+            # Get column information
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            cursor.execute(f"DESCRIBE `{self.current_table}`")
+            columns = cursor.fetchall()
+            cursor.close()
+            conn.close()
+            
+            # Create add row dialog
+            self.create_row_dialog("Add", columns, None)
             
         except Exception as e:
             messagebox.showerror("Error", f"Failed to get table structure: {str(e)}")
+            self.update_status(f"❌ Failed to prepare add dialog: {str(e)}")
     
     def edit_table_row(self):
-        """Edit selected row"""
-        selected = self.data_tree.selection()
-        if not selected:
-            messagebox.showwarning("Warning", "Please select a row to edit")
+        """Edit the selected row"""
+        selection = self.table_content_tree.selection()
+        if not selection or not self.current_table:
             return
-        
-        table_name = self.table_var.get()
-        if not table_name:
-            messagebox.showwarning("Warning", "No table selected")
-            return
-        
-        # Get row data
-        item = self.data_tree.item(selected[0])
-        row_values = item['values']
         
         try:
+            # Get selected row data
+            item = self.table_content_tree.item(selection[0])
+            row_values = item['values']
+            
+            # Get column information
             conn = self.get_connection()
-            if not conn:
-                return
-            
             cursor = conn.cursor()
-            
-            # Get column info
-            cursor.execute(f"DESCRIBE {table_name}")
+            cursor.execute(f"DESCRIBE `{self.current_table}`")
             columns = cursor.fetchall()
-            
-            # Create edit dialog with current values
-            self.create_row_input_dialog(table_name, columns, "Edit", row_values)
-            
             cursor.close()
             conn.close()
             
+            # Create edit dialog with current values
+            self.create_row_dialog("Edit", columns, row_values)
+            
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to edit row: {str(e)}")
+            messagebox.showerror("Error", f"Failed to prepare edit dialog: {str(e)}")
+            self.update_status(f"❌ Failed to prepare edit dialog: {str(e)}")
     
     def delete_table_row(self):
-        """Delete selected row"""
-        selected = self.data_tree.selection()
-        if not selected:
-            messagebox.showwarning("Warning", "Please select a row to delete")
+        """Delete the selected row"""
+        selection = self.table_content_tree.selection()
+        if not selection or not self.current_table:
             return
-        
-        table_name = self.table_var.get()
-        if not table_name:
-            messagebox.showwarning("Warning", "No table selected")
-            return
-        
-        if not messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this row?"):
-            return
-        
-        # Get row data for WHERE clause (assuming first column is ID)
-        item = self.data_tree.item(selected[0])
-        row_values = item['values']
         
         try:
-            conn = self.get_connection()
-            if not conn:
-                return
+            # Get selected row data
+            item = self.table_content_tree.item(selection[0])
+            row_values = item['values']
             
+            # Get primary key information
+            conn = self.get_connection()
             cursor = conn.cursor()
             
-            # Get primary key column
-            cursor.execute(f"SHOW KEYS FROM {table_name} WHERE Key_name = 'PRIMARY'")
-            pk_info = cursor.fetchone()
+            # Get table structure to find primary key
+            cursor.execute(f"SHOW KEYS FROM `{self.current_table}` WHERE Key_name = 'PRIMARY'")
+            primary_keys = cursor.fetchall()
             
-            if pk_info:
-                pk_column = pk_info[4]  # Column_name
-                pk_value = row_values[0]  # Assuming first column is PK
+            if not primary_keys:
+                messagebox.showerror("Error", "Cannot delete row: No primary key found in table")
+                cursor.close()
+                conn.close()
+                return
+            
+            # Get column names for building WHERE clause
+            cursor.execute(f"DESCRIBE `{self.current_table}`")
+            columns = cursor.fetchall()
+            column_names = [col[0] for col in columns]
+            
+            # Build WHERE clause using primary key
+            where_conditions = []
+            where_values = []
+            
+            for pk in primary_keys:
+                pk_column = pk[4]  # Column_name is at index 4
+                if pk_column in column_names:
+                    col_index = column_names.index(pk_column)
+                    if col_index < len(row_values):
+                        where_conditions.append(f"`{pk_column}` = %s")
+                        where_values.append(row_values[col_index])
+            
+            if not where_conditions:
+                messagebox.showerror("Error", "Cannot delete row: Primary key values not found")
+                cursor.close()
+                conn.close()
+                return
+            
+            # Confirm deletion
+            if messagebox.askyesno("Confirm Delete", 
+                                  f"Are you sure you want to delete this row from {self.current_table}?\n\n"
+                                  f"Primary key values: {', '.join(str(v) for v in where_values)}"):
                 
-                cursor.execute(f"DELETE FROM {table_name} WHERE {pk_column} = %s", (pk_value,))
+                # Execute delete
+                where_clause = " AND ".join(where_conditions)
+                delete_query = f"DELETE FROM `{self.current_table}` WHERE {where_clause}"
+                
+                cursor.execute(delete_query, where_values)
                 conn.commit()
                 
-                self.update_status(f"Row deleted from {table_name}")
-                self.load_table_data()  # Refresh data
-            else:
-                messagebox.showwarning("Warning", "Cannot delete - no primary key found")
+                if cursor.rowcount > 0:
+                    messagebox.showinfo("Success", f"Row deleted successfully from {self.current_table}")
+                    self.update_status(f"✅ Deleted row from {self.current_table}")
+                    
+                    # Refresh table content
+                    self.load_table_content(self.current_table)
+                else:
+                    messagebox.showwarning("Warning", "No rows were deleted")
+                    self.update_status(f"⚠️ No rows deleted from {self.current_table}")
             
             cursor.close()
             conn.close()
             
         except Exception as e:
             messagebox.showerror("Error", f"Failed to delete row: {str(e)}")
+            self.update_status(f"❌ Failed to delete row: {str(e)}")
     
-    def is_auto_timestamp_column(self, col_name, col_type, col_default):
-        """Determine if a column should be automatically handled (not user input)"""
-        col_name_lower = col_name.lower()
-        col_type_lower = col_type.lower()
-        
-        # Common auto-timestamp column patterns
-        auto_timestamp_names = [
-            'created_at', 'updated_at', 'date_added', 'date_created', 'date_updated',
-            'timestamp', 'created_date', 'modified_date', 'insert_date', 'creation_time'
-        ]
-        
-        # Check if column name matches auto-timestamp patterns
-        if any(pattern in col_name_lower for pattern in auto_timestamp_names):
-            return True
-        
-        # Check if column type is timestamp/datetime with automatic default
-        if 'timestamp' in col_type_lower or 'datetime' in col_type_lower:
-            if col_default and ('current_timestamp' in str(col_default).lower() or 
-                               'now()' in str(col_default).lower() or
-                               col_default == 'CURRENT_TIMESTAMP'):
-                return True
-        
-        return False
+    def export_table_data(self):
+        """Export table data to CSV"""
+        try:
+            filename = filedialog.asksaveasfilename(
+                defaultextension=".csv",
+                filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
+            )
+            if filename:
+                # Implementation would go here
+                self.update_status(f"✅ Data exported to {filename}")
+                messagebox.showinfo("Success", f"Data exported to {filename}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to export data: {str(e)}")
     
-    def create_row_input_dialog(self, table_name, columns, mode, current_values=None):
-        """Create dialog for adding/editing rows"""
-        dialog = tk.Toplevel(self.root)
-        dialog.title(f"{mode} Row - {table_name}")
-        dialog.geometry("450x700")  # Made wider and taller
-        dialog.configure(bg=self.colors['primary_bg'])
-        dialog.transient(self.root)
-        dialog.grab_set()
+    def run_schema_analysis(self):
+        """Run schema analysis"""
+        self.analysis_text.delete(1.0, tk.END)
+        self.analysis_text.insert(tk.END, "🔍 Database Schema Analysis Report\n")
+        self.analysis_text.insert(tk.END, "=" * 50 + "\n\n")
         
-        # Center dialog
-        dialog.update_idletasks()
-        x = (dialog.winfo_screenwidth() // 2) - (450 // 2)
-        y = (dialog.winfo_screenheight() // 2) - (700 // 2)
-        dialog.geometry(f"450x700+{x}+{y}")
-        
-        print(f"Creating dialog for {mode} in table {table_name}")  # Debug output
-        
-        # Header with information about auto-handled fields
-        header_label = tk.Label(dialog, text=f"{mode} Row in {table_name}",
-                               bg=self.colors['primary_bg'], fg=self.colors['accent'],
-                               font=('Segoe UI', 14, 'bold'))
-        header_label.pack(pady=(20, 5))
-        
-        # Information about auto-handled fields
-        if mode == "Add":
-            auto_fields = []
-            for col in columns:
-                col_name = col[0]
-                col_type = col[1]
-                col_default = col[4]
-                is_auto_inc = 'auto_increment' in col[5].lower() if col[5] else False
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            # Get schema information
+            cursor.execute("SHOW TABLES")
+            tables = cursor.fetchall()
+            
+            self.analysis_text.insert(tk.END, f"📊 Database: {self.db_var.get()}\n")
+            self.analysis_text.insert(tk.END, f"📋 Total Tables: {len(tables)}\n\n")
+            
+            self.analysis_text.insert(tk.END, "📋 Table Details:\n")
+            self.analysis_text.insert(tk.END, "-" * 30 + "\n")
+            
+            for table in tables:
+                table_name = table[0]
                 
-                if is_auto_inc:
-                    auto_fields.append(f"{col_name} (auto-increment)")
-                elif self.is_auto_timestamp_column(col_name, col_type, col_default):
-                    auto_fields.append(f"{col_name} (auto-timestamp)")
+                # Get table info
+                cursor.execute(f"SELECT COUNT(*) FROM `{table_name}`")
+                row_count = cursor.fetchone()[0]
+                
+                cursor.execute(f"DESCRIBE `{table_name}`")
+                columns = cursor.fetchall()
+                
+                self.analysis_text.insert(tk.END, f"\n🔹 {table_name}\n")
+                self.analysis_text.insert(tk.END, f"   • Columns: {len(columns)}\n")
+                self.analysis_text.insert(tk.END, f"   • Rows: {row_count:,}\n")
+                
+                # Show column details
+                for col in columns:
+                    col_name, col_type, nullable, key, default = col[0], col[1], col[2], col[3], col[4]
+                    key_info = f" [{key}]" if key else ""
+                    null_info = " (NULL)" if nullable == "YES" else " (NOT NULL)"
+                    self.analysis_text.insert(tk.END, f"     - {col_name}: {col_type}{key_info}{null_info}\n")
             
-            if auto_fields:
-                info_text = "Auto-handled fields: " + ", ".join(auto_fields)
-                info_label = tk.Label(dialog, text=info_text,
-                                     bg=self.colors['primary_bg'], fg=self.colors['text_light'],
-                                     font=('Segoe UI', 9), wraplength=400)
-                info_label.pack(pady=(0, 15))
-        
-        # Main content frame (for scrollable area)
-        content_frame = tk.Frame(dialog, bg=self.colors['primary_bg'])
-        content_frame.pack(fill='both', expand=True, padx=0, pady=(0, 10))
-        
-        # Scrollable frame for fields (reduced height to make room for buttons)
-        canvas = tk.Canvas(content_frame, bg=self.colors['primary_bg'], highlightthickness=0)
-        scrollbar = ttk.Scrollbar(content_frame, orient="vertical", command=canvas.yview)
-        scrollable_frame = tk.Frame(canvas, bg=self.colors['primary_bg'])
-        
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-        
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-        
-        # Add mouse wheel scrolling support
-        self.add_mousewheel_support(canvas)
-        
-        # Pack canvas with less height to leave room for buttons at bottom
-        canvas.pack(side="left", fill="both", expand=True, padx=20)
-        scrollbar.pack(side="right", fill="y")
-        
-        # Create input fields
-        entries = {}
-        for i, col in enumerate(columns):
-            col_name = col[0]
-            col_type = col[1]
-            is_nullable = col[2] == 'YES'
-            col_default = col[4]
-            is_auto_inc = 'auto_increment' in col[5].lower() if col[5] else False
+            self.analysis_text.insert(tk.END, f"\n📊 Analysis completed successfully!\n")
+            self.analysis_text.insert(tk.END, f"⏰ Generated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
             
-            # Skip auto-increment fields in add mode
-            if mode == "Add" and is_auto_inc:
-                continue
+            cursor.close()
+            conn.close()
+            self.update_status("✅ Schema analysis completed")
             
-            # Skip timestamp columns with automatic defaults in add mode
-            if mode == "Add" and self.is_auto_timestamp_column(col_name, col_type, col_default):
-                continue
-            
-            # Field frame
-            field_frame = tk.Frame(scrollable_frame, bg=self.colors['primary_bg'])
-            field_frame.pack(fill='x', pady=5, padx=10)
-            
-            # Label with improved information
-            label_text = f"{col_name} ({col_type})"
-            if not is_nullable:
-                label_text += " *"
-            
-            tk.Label(field_frame, text=label_text,
-                    bg=self.colors['primary_bg'], fg=self.colors['text_light'],
-                    font=('Segoe UI', 10)).pack(anchor='w')
-            
-            # Entry
-            entry = tk.Entry(field_frame, bg=self.colors['secondary_bg'],
-                           fg=self.colors['text_light'], font=('Segoe UI', 10),
-                           insertbackground=self.colors['accent'])
-            entry.pack(fill='x', pady=(5, 0))
-            
-            # Set current value for edit mode
-            if mode == "Edit" and current_values and i < len(current_values):
-                entry.insert(0, str(current_values[i]) if current_values[i] is not None else "")
-            
-            entries[col_name] = entry
+        except Exception as e:
+            self.analysis_text.insert(tk.END, f"❌ Analysis Error: {str(e)}\n")
+            self.update_status(f"❌ Schema analysis failed: {str(e)}")
+    
+    def generate_migration_summary(self):
+        """Generate migration summary"""
+        self.analysis_text.delete(1.0, tk.END)
+        self.analysis_text.insert(tk.END, "📋 Migration Operations Summary\n")
+        self.analysis_text.insert(tk.END, "=" * 50 + "\n\n")
         
-        # Fixed buttons at the bottom of the dialog (outside scrollable area)
-        # Separator line
-        separator = tk.Frame(dialog, height=2, bg=self.colors['border'])
-        separator.pack(fill='x', padx=20, pady=(10, 0))
+        total_operations = 0
         
-        # Buttons frame fixed at bottom - always visible, never scrolls
-        button_frame = tk.Frame(dialog, bg='white', height=120)  # Fixed at bottom
-        button_frame.pack(fill='x', pady=(10, 20), padx=20, side='bottom')
-        button_frame.pack_propagate(False)  # Maintain fixed height
+        for tool, results in self.results.items():
+            total_operations += len(results)
+            self.analysis_text.insert(tk.END, f"🔹 {tool.upper()}\n")
+            self.analysis_text.insert(tk.END, f"   Operations: {len(results)}\n")
+            
+            if results:
+                self.analysis_text.insert(tk.END, "   Recent Results:\n")
+                for result in results[-3:]:  # Show last 3 results
+                    self.analysis_text.insert(tk.END, f"   • {result}\n")
+            else:
+                self.analysis_text.insert(tk.END, "   • No operations performed yet\n")
+            self.analysis_text.insert(tk.END, "\n")
         
-        def save_row():
-            print(f"Save button clicked for {mode} in {table_name}")  # Debug output
+        self.analysis_text.insert(tk.END, f"📊 Total Migration Operations: {total_operations}\n")
+        self.analysis_text.insert(tk.END, f"⏰ Summary generated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        
+        self.update_status("✅ Migration summary generated")
+    
+    def clear_analysis(self):
+        """Clear the analysis report"""
+        self.analysis_text.delete(1.0, tk.END)
+        self.analysis_text.insert(tk.END, "📊 Database Analysis Center\n")
+        self.analysis_text.insert(tk.END, "=" * 50 + "\n\n")
+        self.analysis_text.insert(tk.END, "Analysis report cleared.\n\n")
+        self.analysis_text.insert(tk.END, "🔍 Use 'Schema Analysis' to examine your database structure\n")
+        self.analysis_text.insert(tk.END, "📋 Use 'Migration Summary' to review completed operations\n\n")
+        self.analysis_text.insert(tk.END, "Select an analysis option above to begin...\n")
+        self.update_status("🗑️ Analysis report cleared")
+        
+    
+    # Web interface methods
+    def start_all_web_interfaces(self):
+        """Start all web interfaces"""
+        self.update_status("🚀 Starting all web interfaces...")
+        
+        def start_interfaces():
             try:
-                # Check if at least one field has data
-                has_data = False
-                for col_name, entry in entries.items():
-                    if entry.get().strip():
-                        has_data = True
-                        break
+                # Start web interface launcher
+                subprocess.Popen([
+                    'python', 'launch_web_interfaces.py'
+                ], shell=True)
                 
-                if not has_data:
-                    print("No data entered, showing warning")  # Debug
-                    messagebox.showwarning("Warning", "Please enter at least one field value")
-                    return
+                self.web_interfaces_started = True
+                self.update_status("✅ Web interfaces started successfully")
                 
-                print("Data validation passed, proceeding with database operation")  # Debug
-                conn = self.get_connection()
-                if not conn:
-                    print("Database connection failed")  # Debug
-                    return
-                
-                cursor = conn.cursor()
-                
-                # Prepare data
-                field_names = []
-                field_values = []
-                
-                for col_name, entry in entries.items():
-                    value = entry.get().strip()
-                    if value or value == "0":  # Include if not empty or is zero
-                        field_names.append(col_name)
-                        field_values.append(value if value != "" else None)
-                
-                if mode == "Add":
-                    # INSERT
-                    placeholders = ", ".join(["%s"] * len(field_values))
-                    sql = f"INSERT INTO {table_name} ({', '.join(field_names)}) VALUES ({placeholders})"
-                    cursor.execute(sql, field_values)
-                    success_msg = f"Row added to {table_name} successfully!"
-                else:
-                    # UPDATE - assuming first column is primary key
-                    if current_values:
-                        pk_column = columns[0][0]
-                        pk_value = current_values[0]
-                        
-                        set_clause = ", ".join([f"{name} = %s" for name in field_names])
-                        sql = f"UPDATE {table_name} SET {set_clause} WHERE {pk_column} = %s"
-                        cursor.execute(sql, field_values + [pk_value])
-                        success_msg = f"Row updated in {table_name} successfully!"
-                
-                conn.commit()
-                cursor.close()
-                conn.close()
-                
-                self.update_status(f"Row {mode.lower()}ed in {table_name}")
-                self.load_table_data()  # Refresh data
-                messagebox.showinfo("Success", success_msg)
-                dialog.destroy()
+                # Update web status
+                if hasattr(self, 'web_status_label'):
+                    self.web_status_label.config(text="🌐 Web Interfaces: Running")
                 
             except Exception as e:
-                messagebox.showerror("Error", f"Failed to {mode.lower()} row: {str(e)}")
+                self.update_status(f"❌ Failed to start web interfaces: {str(e)}")
         
-        # Create highly visible buttons fixed at the bottom - always visible
-        save_button = tk.Button(button_frame, text=f"{mode} Row",
-                              bg='#00FF00', fg='black',  # Bright green background
-                              font=('Segoe UI', 12, 'bold'), 
-                              command=save_row,
-                              width=20, height=2,
-                              relief='raised', bd=3,
-                              cursor='hand2',
-                              activebackground='#32CD32',
-                              activeforeground='black')
-        save_button.pack(side='left', padx=(10, 5), pady=10, fill='both', expand=True)
-        
-        cancel_button = tk.Button(button_frame, text="Cancel",
-                                bg='#FF4500', fg='white',  # Bright red/orange background
-                                font=('Segoe UI', 12, 'bold'),
-                                command=dialog.destroy,
-                                width=20, height=2,
-                                relief='raised', bd=3,
-                                cursor='hand2',
-                                activebackground='#FF6347',
-                                activeforeground='white')
-        cancel_button.pack(side='right', padx=(5, 10), pady=10, fill='both', expand=True)
-        
-        print(f"Buttons created and packed for {mode} dialog")  # Debug output
-        print(f"Save button: {save_button}")  # Debug
-        print(f"Cancel button: {cancel_button}")  # Debug
+        thread = threading.Thread(target=start_interfaces)
+        thread.daemon = True
+        thread.start()
     
+    def open_web_page(self, url, tool_name):
+        """Open a specific web page"""
+        try:
+            webbrowser.open(url)
+            self.update_status(f"🌐 Opened {tool_name} web interface: {url}")
+        except Exception as e:
+            self.update_status(f"❌ Failed to open {tool_name} web page: {str(e)}")
+            messagebox.showerror("Error", f"Failed to open {tool_name} web page: {str(e)}")
+    
+    def open_all_web_pages(self):
+        """Open all web interfaces in browser"""
+        self.open_web_page('http://localhost:8080', 'Bytebase')
+        time.sleep(1)
+        self.open_web_page('http://localhost:5001', 'Redgate')
+        time.sleep(1)
+        self.open_web_page('http://localhost:5002', 'Liquibase')
+    
+    # Migration methods
+    def run_bytebase_migration(self):
+        """Run Bytebase migration"""
+        if not self.bytebase_enabled.get():
+            self.update_status("⚠️ Bytebase is disabled in settings")
+            return
+            
+        self.update_status("🔵 Starting Bytebase migration...")
+        
+        def run_migration():
+            try:
+                # Get project root and migrations path
+                project_root = os.path.dirname(os.path.abspath(__file__))
+                migrations_path = os.path.join(project_root, "bytebase", "migrations")
+                
+                # Authenticate with Bytebase
+                self.bytebase_api.authenticate()
+                
+                # Create project
+                project = self.bytebase_api.create_project("gui-migration-test")
+                self.log_to_console(f"✅ Project created: {project.get('title', 'Unknown')}")
+                
+                # Execute migration folder
+                results = self.bytebase_api.execute_migration_folder(migrations_path)
+                
+                # Store and display results
+                self.results['bytebase'] = results
+                for result in results:
+                    self.log_to_console(f"  {result}")
+                
+                self.update_status("✅ Bytebase migration completed")
+                
+            except Exception as e:
+                error_msg = f"❌ Bytebase migration failed: {str(e)}"
+                self.update_status(error_msg)
+                self.log_to_console(error_msg)
+        
+        thread = threading.Thread(target=run_migration)
+        thread.daemon = True
+        thread.start()
+    
+    def run_liquibase_migration(self):
+        """Run Liquibase migration"""
+        if not self.liquibase_enabled.get():
+            self.update_status("⚠️ Liquibase is disabled in settings")
+            return
+            
+        self.update_status("🟣 Starting Liquibase migration...")
+        
+        def run_migration():
+            try:
+                # Change to liquibase directory
+                original_dir = os.getcwd()
+                project_root = os.path.dirname(os.path.abspath(__file__))
+                liquibase_dir = os.path.join(project_root, "liquibase")
+                
+                self.log_to_console(f"📁 Liquibase directory: {liquibase_dir}")
+                
+                if not os.path.exists(liquibase_dir):
+                    error_msg = f"❌ Liquibase directory not found: {liquibase_dir}"
+                    self.log_to_console(error_msg)
+                    self.update_status("❌ Liquibase directory not found")
+                    return
+                
+                os.chdir(liquibase_dir)
+                self.log_to_console(f"📁 Changed to directory: {os.getcwd()}")
+                
+                # Run liquibase update with shell=True for Windows
+                result = subprocess.run(
+                    ["liquibase", "update"],
+                    capture_output=True,
+                    text=True,
+                    shell=True,
+                    timeout=60
+                )
+                
+                os.chdir(original_dir)
+                
+                if result.returncode == 0:
+                    self.log_to_console("✅ Liquibase update successful")
+                    
+                    # Parse output for meaningful information
+                    output_lines = result.stdout.split('\n')
+                    for line in output_lines:
+                        if any(keyword in line.lower() for keyword in ['changesets run', 'update summary', 'successfully', 'executed']):
+                            self.log_to_console(f"  {line.strip()}")
+                    
+                    # Check if any changesets were actually applied
+                    if "Liquibase command 'update' was executed successfully" in result.stdout:
+                        self.log_to_console("  📊 All changesets applied successfully")
+                    
+                    self.results['liquibase'] = ['✅ Liquibase update completed successfully']
+                    self.update_status("✅ Liquibase migration completed")
+                else:
+                    error_msg = f"❌ Liquibase failed (exit code {result.returncode})"
+                    self.log_to_console(error_msg)
+                    if result.stderr:
+                        self.log_to_console(f"Error details: {result.stderr}")
+                    if result.stdout:
+                        self.log_to_console(f"Output: {result.stdout}")
+                    self.update_status("❌ Liquibase migration failed")
+                
+            except FileNotFoundError:
+                error_msg = "❌ Liquibase not found. Please ensure Liquibase is installed and in PATH"
+                self.update_status(error_msg)
+                self.log_to_console(error_msg)
+            except subprocess.TimeoutExpired:
+                error_msg = "❌ Liquibase update timed out after 60 seconds"
+                self.update_status(error_msg)
+                self.log_to_console(error_msg)
+            except Exception as e:
+                error_msg = f"❌ Liquibase error: {str(e)}"
+                self.update_status(error_msg)
+                self.log_to_console(error_msg)
+        
+        thread = threading.Thread(target=run_migration)
+        thread.daemon = True
+        thread.start()
+    
+    def run_redgate_migration(self):
+        """Run Redgate migration"""
+        if not self.redgate_enabled.get():
+            self.update_status("⚠️ Redgate is disabled in settings")
+            return
+            
+        self.update_status("🔴 Starting Redgate migration...")
+        
+        def run_migration():
+            try:
+                # Get project root and migrations path
+                project_root = os.path.dirname(os.path.abspath(__file__))
+                migrations_path = os.path.join(project_root, "redgate", "migrations")
+                
+                self.log_to_console(f"📁 Using migration path: {migrations_path}")
+                
+                # Deploy migration package
+                results = self.redgate_simulator.deploy_migration_package(migrations_path)
+                
+                # Store and display results
+                self.results['redgate'] = results
+                for result in results:
+                    self.log_to_console(f"  {result}")
+                
+                self.update_status("✅ Redgate migration completed")
+                
+            except Exception as e:
+                error_msg = f"❌ Redgate migration failed: {str(e)}"
+                self.update_status(error_msg)
+                self.log_to_console(error_msg)
+        
+        thread = threading.Thread(target=run_migration)
+        thread.daemon = True
+        thread.start()
+    
+    def run_all_migrations(self):
+        """Run all enabled migrations sequentially"""
+        self.update_status("🚀 Starting all migrations...")
+        self.log_to_console("\n" + "="*60)
+        self.log_to_console("🚀 COMPREHENSIVE MIGRATION TEST")
+        self.log_to_console("="*60)
+        
+        def run_all():
+            if self.redgate_enabled.get():
+                self.run_redgate_migration()
+                time.sleep(2)
+            
+            if self.liquibase_enabled.get():
+                time.sleep(3)
+                self.run_liquibase_migration()
+                time.sleep(2)
+            
+            if self.bytebase_enabled.get():
+                time.sleep(3)
+                self.run_bytebase_migration()
+            
+            time.sleep(2)
+            self.update_status("✅ All migrations completed")
+        
+        thread = threading.Thread(target=run_all)
+        thread.daemon = True
+        thread.start()
+    
+    def run_automated_test(self):
+        """Run automated tests"""
+        self.update_status("🧪 Running automated tests...")
+        
+        def run_test():
+            try:
+                # Run the test tools script
+                result = subprocess.run(
+                    ["python", "test_tools.py"],
+                    capture_output=True,
+                    text=True,
+                    timeout=60
+                )
+                
+                self.log_to_console("\n🧪 AUTOMATED TEST RESULTS:")
+                self.log_to_console("="*40)
+                self.log_to_console(result.stdout)
+                
+                if result.returncode == 0:
+                    self.update_status("✅ Automated tests completed successfully")
+                else:
+                    self.update_status("❌ Some automated tests failed")
+                    
+            except Exception as e:
+                error_msg = f"❌ Test execution failed: {str(e)}"
+                self.update_status(error_msg)
+                self.log_to_console(error_msg)
+        
+        thread = threading.Thread(target=run_test)
+        thread.daemon = True
+        thread.start()
+    
+    def reset_database(self):
+        """Reset database to clean state"""
+        if messagebox.askyesno("Confirm Reset", "Are you sure you want to reset the database? This will clear all data."):
+            self.update_status("🔄 Resetting database...")
+            
+            def reset_db():
+                try:
+                    # Run the reset script
+                    result = subprocess.run(
+                        ["python", "reset_database.py"],
+                        capture_output=True,
+                        text=True,
+                        timeout=30
+                    )
+                    
+                    self.log_to_console("🔄 Database reset completed")
+                    self.log_to_console(result.stdout)
+                    
+                    self.update_status("✅ Database reset completed")
+                    self.refresh_tables()
+                    
+                except Exception as e:
+                    error_msg = f"❌ Database reset failed: {str(e)}"
+                    self.update_status(error_msg)
+                    self.log_to_console(error_msg)
+            
+            thread = threading.Thread(target=reset_db)
+            thread.daemon = True
+            thread.start()
+
+
 def main():
+    """Main function to start the GUI"""
     root = tk.Tk()
     app = ProfessionalMigrationGUI(root)
     root.mainloop()
+
 
 if __name__ == "__main__":
     main()

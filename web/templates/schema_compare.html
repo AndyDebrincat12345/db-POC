@@ -1,0 +1,92 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redgate Schema Compare</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f8f9fa;
+        }
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 1rem 2rem;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        .back-btn {
+            background: #6c757d;
+            color: white;
+            padding: 0.5rem 1rem;
+            text-decoration: none;
+            border-radius: 3px;
+            margin-bottom: 1rem;
+            display: inline-block;
+        }
+        .comparison-panel {
+            background: white;
+            border-radius: 8px;
+            padding: 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Schema Compare</h1>
+    </div>
+    
+    <div class="container">
+        <a href="/" class="back-btn">← Back to Dashboard</a>
+        
+        <div class="comparison-panel">
+            <h2>Current Database Schema</h2>
+            {% if comparison.error %}
+            <p style="color: red;">Error: {{ comparison.error }}</p>
+            {% else %}
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number">{{ comparison.table_count }}</div>
+                    <div>Tables</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{{ comparison.procedure_count }}</div>
+                    <div>Procedures</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">{{ comparison.trigger_count }}</div>
+                    <div>Triggers</div>
+                </div>
+            </div>
+            <p><strong>Schema file:</strong> {{ comparison.schema_file }}</p>
+            <p><strong>Generated:</strong> {{ comparison.last_generated }}</p>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

@@ -6,8 +6,13 @@
     http://www.liquibase.org/xml/ns/dbchangelog
     https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
 
+  <!-- Initial comprehensive user management system -->
   <include file="001-create-users-comprehensive.xml" />
+  
+  <!-- Roles and permissions system -->
   <include file="002-create-roles-permissions.xml" />
+  
+  <!-- Inventory and product management -->
   <include file="003-alter-tables-inventory.xml" />
 
 </databaseChangeLog>

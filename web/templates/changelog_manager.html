@@ -1,0 +1,79 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Liquibase Changelog Manager</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f8fafc;
+        }
+        .header {
+            background: #1e293b;
+            color: white;
+            padding: 1rem 2rem;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        .back-btn {
+            background: #6b7280;
+            color: white;
+            padding: 0.5rem 1rem;
+            text-decoration: none;
+            border-radius: 3px;
+            margin-bottom: 1rem;
+            display: inline-block;
+        }
+        .changelog-item {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-left: 4px solid #4f46e5;
+        }
+        .changelog-preview {
+            background: #f3f4f6;
+            border-radius: 5px;
+            padding: 1rem;
+            margin-top: 1rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Changelog Manager</h1>
+    </div>
+    
+    <div class="container">
+        <a href="/" class="back-btn">← Back to Dashboard</a>
+        
+        <h2>Changelog Files</h2>
+        {% if changelog_files %}
+        {% for file in changelog_files %}
+        <div class="changelog-item">
+            <h3>{{ file.name }}</h3>
+            <p><strong>Size:</strong> {{ file.size }} characters</p>
+            <p><strong>Path:</strong> {{ file.path }}</p>
+            <details>
+                <summary>Preview</summary>
+                <div class="changelog-preview">{{ file.preview }}</div>
+            </details>
+        </div>
+        {% endfor %}
+        {% else %}
+        <p>No changelog files found in the changelog directory.</p>
+        {% endif %}
+    </div>
+</body>
+</html>

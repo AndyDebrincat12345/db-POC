@@ -1,0 +1,96 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Liquibase History</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f8fafc;
+        }
+        .header {
+            background: #1e293b;
+            color: white;
+            padding: 1rem 2rem;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        .history-item {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status-success {
+            border-left: 4px solid #059669;
+        }
+        .status-failed {
+            border-left: 4px solid #dc2626;
+        }
+        .back-btn {
+            background: #6b7280;
+            color: white;
+            padding: 0.5rem 1rem;
+            text-decoration: none;
+            border-radius: 3px;
+            margin-bottom: 1rem;
+            display: inline-block;
+        }
+        .code-output {
+            background: #1f2937;
+            color: #e5e7eb;
+            padding: 1rem;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Execution History</h1>
+    </div>
+    
+    <div class="container">
+        <a href="/" class="back-btn">← Back to Dashboard</a>
+        
+        <h2>Recent Executions</h2>
+        {% if execution_history %}
+        {% for item in execution_history %}
+        <div class="history-item {% if item.success %}status-success{% else %}status-failed{% endif %}">
+            <h3>{{ item.command }}</h3>
+            <p><strong>Timestamp:</strong> {{ item.timestamp }}</p>
+            <p><strong>Status:</strong> {% if item.success %}Success{% else %}Failed{% endif %}</p>
+            {% if item.output %}
+            <details>
+                <summary>View Output</summary>
+                <div class="code-output">{{ item.output }}</div>
+            </details>
+            {% endif %}
+        </div>
+        {% endfor %}
+        {% else %}
+        <p>No executions yet. Run some commands from the dashboard.</p>
+        {% endif %}
+        
+        {% if db_history.success %}
+        <h2>Database History</h2>
+        <div class="history-item">
+            <h3>Liquibase Database History</h3>
+            <div class="code-output">{{ db_history.stdout }}</div>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

@@ -1,11 +1,23 @@
-name: bytebase-poc
-environment: local
+# Bytebase Enterprise Configuration
+name: enterprise-migration-poc
+environment: development
+description: "Professional database migration tool comparison"
+
 database:
   type: mysql
   host: localhost
   port: 3306
   username: root
-  database: poc_db
+  database: status_poc
+  
 migrations:
   folder: migrations
   order: filename
+  validation: true
+  backup_before_deploy: true
+  
+enterprise_features:
+  sql_review: enabled
+  approval_workflow: enabled
+  audit_logging: enabled
+  schema_drift_detection: enabled
