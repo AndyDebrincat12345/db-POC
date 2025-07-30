@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+
+    <changeSet id="sqlserver-users-1" author="poc-team">
+        <createTable tableName="users_comprehensive">
+            <column name="id" type="INT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="username" type="NVARCHAR(50)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="email" type="NVARCHAR(255)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="password_hash" type="NVARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="first_name" type="NVARCHAR(100)"/>
+            <column name="last_name" type="NVARCHAR(100)"/>
+            <column name="date_of_birth" type="DATE"/>
+            <column name="phone_number" type="NVARCHAR(20)"/>
+            <column name="is_active" type="BIT" defaultValueBoolean="1"/>
+            <column name="salary" type="DECIMAL(10,2)"/>
+            <column name="bio" type="NVARCHAR(MAX)"/>
+            <column name="preferences" type="NVARCHAR(MAX)"/>
+            <column name="avatar_url" type="NVARCHAR(500)"/>
+            <column name="last_login_at" type="DATETIME2"/>
+            <column name="created_at" type="DATETIME2" defaultValueComputed="GETDATE()"/>
+            <column name="updated_at" type="DATETIME2" defaultValueComputed="GETDATE()"/>
+        </createTable>
+        
+        <!-- SQL Server-specific indexes -->
+        <createIndex tableName="users_comprehensive" indexName="idx_username">
+            <column name="username"/>
+        </createIndex>
+        
+        <createIndex tableName="users_comprehensive" indexName="idx_email">
+            <column name="email"/>
+        </createIndex>
+        
+        <createIndex tableName="users_comprehensive" indexName="idx_last_login">
+            <column name="last_login_at"/>
+        </createIndex>
+        
+        <!-- SQL Server composite index -->
+        <createIndex tableName="users_comprehensive" indexName="idx_active_users">
+            <column name="is_active"/>
+            <column name="created_at"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

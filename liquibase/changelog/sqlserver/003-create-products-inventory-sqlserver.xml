@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+
+    <changeSet id="sqlserver-products-1" author="poc-team">
+        <!-- Products table for SQL Server -->
+        <createTable tableName="products">
+            <column name="id" type="INT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="name" type="NVARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="description" type="NVARCHAR(MAX)"/>
+            <column name="price" type="DECIMAL(10,2)"/>
+            <column name="quantity_in_stock" type="INT" defaultValueNumeric="0"/>
+            <column name="category" type="NVARCHAR(100)"/>
+            <column name="sku" type="NVARCHAR(50)">
+                <constraints unique="true"/>
+            </column>
+            <column name="created_at" type="DATETIME2" defaultValueComputed="GETDATE()"/>
+            <column name="updated_at" type="DATETIME2" defaultValueComputed="GETDATE()"/>
+        </createTable>
+
+        <!-- Inventory transactions table for SQL Server -->
+        <createTable tableName="inventory_transactions">
+            <column name="id" type="INT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="product_id" type="INT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="transaction_type" type="NVARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="quantity" type="INT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="notes" type="NVARCHAR(MAX)"/>
+            <column name="created_at" type="DATETIME2" defaultValueComputed="GETDATE()"/>
+        </createTable>
+
+        <!-- Check constraint for transaction type -->
+        <sql>
+            ALTER TABLE inventory_transactions 
+            ADD CONSTRAINT chk_transaction_type 
+            CHECK (transaction_type IN ('IN', 'OUT', 'ADJUSTMENT'))
+        </sql>
+
+        <!-- Foreign key constraints -->
+        <addForeignKeyConstraint baseTableName="inventory_transactions" baseColumnNames="product_id"
+                                constraintName="fk_inventory_product"
+                                referencedTableName="products" referencedColumnNames="id"/>
+
+        <!-- Indexes for SQL Server -->
+        <createIndex tableName="products" indexName="idx_products_sku">
+            <column name="sku"/>
+        </createIndex>
+        
+        <createIndex tableName="products" indexName="idx_products_category">
+            <column name="category"/>
+        </createIndex>
+        
+        <createIndex tableName="inventory_transactions" indexName="idx_transactions_product">
+            <column name="product_id"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

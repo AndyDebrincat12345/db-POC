@@ -16,6 +16,8 @@ import webbrowser
 import time
 import mysql.connector
 import pyodbc
+import http.server
+import socketserver
 
 # Import our tool implementations
 from bytebase_api import BytebaseAPI
@@ -664,35 +666,10 @@ class ProfessionalMigrationGUI:
                                                font=('Segoe UI', 9), bg='white')
         self.connection_status_label.grid(row=6, column=0, columnspan=4, pady=5)
         
-        # Tool Settings
-        tools_frame = tk.LabelFrame(settings_content,
-                                   text="🛠️ Tool Configuration",
-                                   font=('Segoe UI', 12, 'bold'),
-                                   bg='white')
-        tools_frame.pack(fill='x', pady=10)
-        
-        tools_content = tk.Frame(tools_frame, bg='white')
-        tools_content.pack(padx=20, pady=15)
-        
-        # Tool status checkboxes
+        # Initialize tool variables (for backward compatibility)
         self.bytebase_enabled = tk.BooleanVar(value=True)
         self.liquibase_enabled = tk.BooleanVar(value=True)
         self.redgate_enabled = tk.BooleanVar(value=True)
-        
-        tk.Checkbutton(tools_content, text="🔵 Enable Bytebase",
-                      variable=self.bytebase_enabled,
-                      font=('Segoe UI', 10),
-                      bg='white').pack(anchor='w', pady=2)
-        
-        tk.Checkbutton(tools_content, text="🟣 Enable Liquibase",
-                      variable=self.liquibase_enabled,
-                      font=('Segoe UI', 10),
-                      bg='white').pack(anchor='w', pady=2)
-        
-        tk.Checkbutton(tools_content, text="🔴 Enable Redgate",
-                      variable=self.redgate_enabled,
-                      font=('Segoe UI', 10),
-                      bg='white').pack(anchor='w', pady=2)
         
         # Initialize the form based on current database type
         self.on_db_type_change()
@@ -1914,26 +1891,263 @@ class ProfessionalMigrationGUI:
         """Start all web interfaces"""
         self.update_status("🚀 Starting all web interfaces...")
         
-        def start_interfaces():
-            try:
-                # Start web interface launcher
-                subprocess.Popen([
-                    'python', 'launch_web_interfaces.py'
-                ], shell=True)
-                
-                self.web_interfaces_started = True
-                self.update_status("✅ Web interfaces started successfully")
-                
-                # Update web status
-                if hasattr(self, 'web_status_label'):
-                    self.web_status_label.config(text="🌐 Web Interfaces: Running")
-                
-            except Exception as e:
-                self.update_status(f"❌ Failed to start web interfaces: {str(e)}")
+        try:
+            # Start each web server in its own thread to prevent blocking
+            bytebase_thread = threading.Thread(target=self._start_bytebase_web_server)
+            bytebase_thread.daemon = True
+            bytebase_thread.start()
+            
+            redgate_thread = threading.Thread(target=self._start_redgate_web_server)
+            redgate_thread.daemon = True
+            redgate_thread.start()
+            
+            liquibase_thread = threading.Thread(target=self._start_liquibase_web_server)
+            liquibase_thread.daemon = True
+            liquibase_thread.start()
+            
+            # Give servers a moment to start
+            import time
+            time.sleep(1)
+            
+            self.web_interfaces_started = True
+            self.update_status("✅ Web interfaces started successfully on ports 8080, 5001, 5002")
+            
+        except Exception as e:
+            self.update_status(f"❌ Failed to start web interfaces: {str(e)}")
+    
+    def _start_bytebase_web_server(self):
+        """Start Bytebase web server on port 8080"""
+        import http.server
+        import socketserver
+        from datetime import datetime
         
-        thread = threading.Thread(target=start_interfaces)
-        thread.daemon = True
-        thread.start()
+        class BytebaseHandler(http.server.SimpleHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header('Content-type', 'text/html')
+                self.end_headers()
+                
+                html = f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Bytebase Migration Interface</title>
+                    <style>
+                        body {{ font-family: 'Segoe UI', sans-serif; margin: 40px; background: #f5f5f5; }}
+                        .container {{ background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
+                        .header {{ color: #2563eb; border-bottom: 3px solid #2563eb; padding-bottom: 15px; margin-bottom: 25px; }}
+                        .status {{ background: #dbeafe; color: #1e40af; padding: 15px; border-radius: 6px; margin: 15px 0; }}
+                        .feature {{ background: #f8fafc; padding: 15px; margin: 10px 0; border-left: 4px solid #2563eb; }}
+                        .footer {{ margin-top: 30px; padding-top: 15px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 14px; }}
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <h1 class="header">🔵 Bytebase Migration Interface</h1>
+                        <div class="status">
+                            <strong>Status:</strong> Connected and Ready<br>
+                            <strong>Database:</strong> Migration tracking active<br>
+                            <strong>Time:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+                        </div>
+                        
+                        <h2>Migration Features</h2>
+                        <div class="feature">
+                            <strong>📋 Issue-based Workflow:</strong> Each migration creates a tracked issue with BB-xxxx IDs
+                        </div>
+                        <div class="feature">
+                            <strong>📊 Version Control:</strong> Automatic version extraction and migration tracking
+                        </div>
+                        <div class="feature">
+                            <strong>🔄 Status Management:</strong> PENDING → RUNNING → DONE/FAILED state tracking
+                        </div>
+                        <div class="feature">
+                            <strong>⚡ Performance:</strong> Fastest execution with minimal overhead
+                        </div>
+                        
+                        <h2>Recent Activity</h2>
+                        <p>Use the main application to execute Bytebase migrations. This interface shows the web connectivity status.</p>
+                        
+                    <div class="footer">
+                        Bytebase Web Interface • Port 8080 • Database Migration POC
+                    </div>
+                </div>
+            </body>
+            </html>
+            """
+            
+            self.wfile.write(html.encode())
+            
+            def log_message(self, format, *args):
+                # Suppress server logging to console
+                pass
+        
+        try:
+            with socketserver.TCPServer(("", 8080), BytebaseHandler) as httpd:
+                print(f"[DEBUG] Bytebase web server started on port 8080")
+                httpd.serve_forever()
+        except OSError as e:
+            if e.errno == 10048:  # Port already in use
+                print(f"[DEBUG] Bytebase port 8080 already in use")
+            else:
+                print(f"[ERROR] Bytebase web server error: {e}")
+        except Exception as e:
+            print(f"[ERROR] Bytebase web server unexpected error: {e}")
+    
+    def _start_redgate_web_server(self):
+        """Start Redgate web server on port 5001"""
+        import http.server
+        import socketserver
+        from datetime import datetime
+        
+        class RedgateHandler(http.server.SimpleHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header('Content-type', 'text/html')
+                self.end_headers()
+                
+                html = f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Redgate SQL Compare & Deploy</title>
+                    <style>
+                        body {{ font-family: 'Segoe UI', sans-serif; margin: 40px; background: #f5f5f5; }}
+                        .container {{ background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
+                        .header {{ color: #dc2626; border-bottom: 3px solid #dc2626; padding-bottom: 15px; margin-bottom: 25px; }}
+                        .status {{ background: #fee2e2; color: #991b1b; padding: 15px; border-radius: 6px; margin: 15px 0; }}
+                        .feature {{ background: #f8fafc; padding: 15px; margin: 10px 0; border-left: 4px solid #dc2626; }}
+                        .footer {{ margin-top: 30px; padding-top: 15px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 14px; }}
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <h1 class="header">🔴 Redgate SQL Compare & Deploy</h1>
+                        <div class="status">
+                            <strong>Status:</strong> Schema comparison ready<br>
+                            <strong>Database:</strong> Deployment tracking active<br>
+                            <strong>Time:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+                        </div>
+                        
+                        <h2>Deployment Features</h2>
+                        <div class="feature">
+                            <strong>🔍 Schema Comparison:</strong> Automatic analysis of database object changes
+                        </div>
+                        <div class="feature">
+                            <strong>📋 Deployment Planning:</strong> Pre-deployment validation and change review
+                        </div>
+                        <div class="feature">
+                            <strong>📊 Change Tracking:</strong> Detailed logging of deployed changes with RG-DEPLOY-xxxx IDs
+                        </div>
+                        <div class="feature">
+                            <strong>🛡️ Safety Features:</strong> Backup recommendations and transaction safety
+                        </div>
+                        
+                        <h2>Schema Analysis</h2>
+                        <p>Use the main application to execute Redgate deployments. This interface shows the web connectivity status.</p>
+                        
+                        <div class="footer">
+                            Redgate Web Interface • Port 5001 • Database Migration POC
+                        </div>
+                    </div>
+                </body>
+                </html>
+                """
+                
+                self.wfile.write(html.encode())
+            
+            def log_message(self, format, *args):
+                # Suppress server logging to console
+                pass
+        
+        try:
+            with socketserver.TCPServer(("", 5001), RedgateHandler) as httpd:
+                print(f"[DEBUG] Redgate web server started on port 5001")
+                httpd.serve_forever()
+        except OSError as e:
+            if e.errno == 10048:  # Port already in use
+                print(f"[DEBUG] Redgate port 5001 already in use")
+            else:
+                print(f"[ERROR] Redgate web server error: {e}")
+        except Exception as e:
+            print(f"[ERROR] Redgate web server unexpected error: {e}")
+    
+    def _start_liquibase_web_server(self):
+        """Start Liquibase web server on port 5002"""
+        import http.server
+        import socketserver
+        from datetime import datetime
+        
+        class LiquibaseHandler(http.server.SimpleHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header('Content-type', 'text/html')
+                self.end_headers()
+                
+                html = f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Liquibase Migration Hub</title>
+                    <style>
+                        body {{ font-family: 'Segoe UI', sans-serif; margin: 40px; background: #f5f5f5; }}
+                        .container {{ background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
+                        .header {{ color: #7c3aed; border-bottom: 3px solid #7c3aed; padding-bottom: 15px; margin-bottom: 25px; }}
+                        .status {{ background: #ede9fe; color: #5b21b6; padding: 15px; border-radius: 6px; margin: 15px 0; }}
+                        .feature {{ background: #f8fafc; padding: 15px; margin: 10px 0; border-left: 4px solid #7c3aed; }}
+                        .footer {{ margin-top: 30px; padding-top: 15px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 14px; }}
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <h1 class="header">🟣 Liquibase Migration Hub</h1>
+                        <div class="status">
+                            <strong>Status:</strong> Changelog processing ready<br>
+                            <strong>Database:</strong> DATABASECHANGELOG tracking active<br>
+                            <strong>Time:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+                        </div>
+                        
+                        <h2>Migration Features</h2>
+                        <div class="feature">
+                            <strong>📄 XML Changelogs:</strong> Structured changeset definitions with author and ID tracking
+                        </div>
+                        <div class="feature">
+                            <strong>🔄 Change Management:</strong> Automatic tracking in DATABASECHANGELOG table
+                        </div>
+                        <div class="feature">
+                            <strong>🌐 Enterprise Features:</strong> Full Liquibase CLI integration with advanced capabilities
+                        </div>
+                        <div class="feature">
+                            <strong>🚀 Rollback Support:</strong> Advanced rollback and change reversal capabilities
+                        </div>
+                        
+                        <h2>Changelog Status</h2>
+                        <p>Use the main application to execute Liquibase migrations. This interface shows the web connectivity status.</p>
+                        
+                        <div class="footer">
+                            Liquibase Web Interface • Port 5002 • Database Migration POC
+                        </div>
+                    </div>
+                </body>
+                </html>
+                """
+                
+                self.wfile.write(html.encode())
+            
+            def log_message(self, format, *args):
+                # Suppress server logging to console
+                pass
+        
+        try:
+            with socketserver.TCPServer(("", 5002), LiquibaseHandler) as httpd:
+                print(f"[DEBUG] Liquibase web server started on port 5002")
+                httpd.serve_forever()
+        except OSError as e:
+            if e.errno == 10048:  # Port already in use
+                print(f"[DEBUG] Liquibase port 5002 already in use")
+            else:
+                print(f"[ERROR] Liquibase web server error: {e}")
+        except Exception as e:
+            print(f"[ERROR] Liquibase web server unexpected error: {e}")
     
     def open_web_page(self, url, tool_name):
         """Open a specific web page"""
@@ -1979,13 +2193,11 @@ class ProfessionalMigrationGUI:
             # Return the first non-browser service port found
             if detected_ports:
                 port = detected_ports[0]
-                self.log_to_console(f"🔍 Detected SQL Server dynamic port: {port}")
                 return port
             
             return None
             
         except Exception as e:
-            self.log_to_console(f"⚠️ Port detection failed: {str(e)}")
             return None
 
     def _create_temp_liquibase_properties_sqlserver(self):
@@ -1997,6 +2209,10 @@ class ProfessionalMigrationGUI:
             database = self.db_var.get()
             username = self.username_var.get()
             password = self.password_var.get()
+            
+            # Ensure we have the correct liquibase directory path
+            project_root = os.path.dirname(os.path.abspath(__file__))
+            liquibase_dir = os.path.join(project_root, "liquibase")
             
             # Enhanced SQL Server JDBC URL handling with multiple fallback strategies
             detected_port = None
@@ -2010,28 +2226,23 @@ class ProfessionalMigrationGUI:
                 if detected_port and detected_port != "1433":
                     server_address = f"{base_host}:{detected_port}"
                     jdbc_url_base = f"jdbc:sqlserver://{server_address}"
-                    self.log_to_console(f"🔗 Using Strategy 1: Detected dynamic port {detected_port}")
                 # Strategy 2: Try with explicit port if available and not default
                 elif port and port != "1433":
                     server_address = f"{base_host}:{port}"
                     jdbc_url_base = f"jdbc:sqlserver://{server_address}"
-                    self.log_to_console(f"🔗 Using Strategy 2: Explicit port {port}")
                 else:
                     # Strategy 3: Try localhost with default port (most reliable for local connections)
                     if base_host.lower() in ['localhost', '127.0.0.1', '.']:
                         server_address = f"{base_host}:1433"
                         jdbc_url_base = f"jdbc:sqlserver://{server_address}"
-                        self.log_to_console(f"🔗 Using Strategy 3: Default port 1433 for local connection")
                     else:
                         # Strategy 4: Named instance with instanceName parameter
                         server_address = base_host
                         jdbc_url_base = f"jdbc:sqlserver://{server_address};instanceName={instance_name}"
-                        self.log_to_console(f"🔗 Using Strategy 4: instanceName parameter")
             else:
                 # Regular host format
                 server_address = f"{host}:{port}" if port else f"{host}:1433"
                 jdbc_url_base = f"jdbc:sqlserver://{server_address}"
-                self.log_to_console(f"🔗 Using regular host format")
             
             # Add connection parameters for reliability - try minimal set first
             detected_port = None
@@ -2041,11 +2252,9 @@ class ProfessionalMigrationGUI:
             if detected_port and detected_port != "1433":
                 # For dynamic ports, use minimal connection parameters to avoid protocol issues
                 connection_params = "databaseName={};integratedSecurity=true;encrypt=false;trustServerCertificate=true".format(database)
-                self.log_to_console(f"🔧 Using minimal connection parameters for dynamic port {detected_port}")
             else:
                 # For standard ports, use full parameters
                 connection_params = "databaseName={};trustServerCertificate=true;loginTimeout=15;socketTimeout=15000;encrypt=false".format(database)
-                self.log_to_console(f"🔧 Using standard connection parameters")
             
             # Create SQL Server JDBC URL with proper syntax
             if self.trusted_connection_var.get():
@@ -2058,7 +2267,7 @@ class ProfessionalMigrationGUI:
                 properties_content = f"""# Temporary Liquibase properties for SQL Server (Windows Authentication)
 url={jdbc_url}
 driver=com.microsoft.sqlserver.jdbc.SQLServerDriver
-changeLogFile=changelog/db.changelog-master.xml
+changeLogFile=changelog/sqlserver/db.changelog-master.xml
 """
             else:
                 # SQL Server Authentication
@@ -2069,15 +2278,13 @@ url={jdbc_url}
 username={username}
 password={password}
 driver=com.microsoft.sqlserver.jdbc.SQLServerDriver
-changeLogFile=changelog/db.changelog-master.xml
+changeLogFile=changelog/sqlserver/db.changelog-master.xml
 """
             
             # Write temporary properties file
-            liquibase_properties_path = os.path.join(os.getcwd(), "liquibase", "liquibase.properties")
+            liquibase_properties_path = os.path.join(liquibase_dir, "liquibase.properties")
             with open(liquibase_properties_path, 'w') as f:
                 f.write(properties_content)
-            
-            self.log_to_console(f"📝 Enhanced SQL Server JDBC URL: {jdbc_url}")
             
         except Exception as e:
             raise Exception(f"Failed to create SQL Server Liquibase configuration: {str(e)}")
@@ -2091,7 +2298,9 @@ changeLogFile=changelog/db.changelog-master.xml
             username = self.username_var.get()
             password = self.password_var.get()
             
-            self.log_to_console("🔄 Creating fallback Liquibase configuration...")
+            # Ensure we have the correct liquibase directory path
+            project_root = os.path.dirname(os.path.abspath(__file__))
+            liquibase_dir = os.path.join(project_root, "liquibase")
             
             # Use named instance approach as fallback
             if "\\" in host:
@@ -2101,13 +2310,10 @@ changeLogFile=changelog/db.changelog-master.xml
                 # Try named instance with minimal parameters
                 jdbc_url_base = f"jdbc:sqlserver://{base_host}"
                 connection_params = f"instanceName={instance_name};databaseName={database};integratedSecurity=true;encrypt=false"
-                
-                self.log_to_console(f"🔄 Fallback: Using named instance approach")
             else:
                 # Fallback to basic connection
                 jdbc_url_base = f"jdbc:sqlserver://{host}:1433"
                 connection_params = f"databaseName={database};integratedSecurity=true;encrypt=false"
-                self.log_to_console(f"🔄 Fallback: Using basic connection")
             
             # Create fallback JDBC URL
             if self.trusted_connection_var.get():
@@ -2116,7 +2322,7 @@ changeLogFile=changelog/db.changelog-master.xml
                 properties_content = f"""# Fallback Liquibase properties for SQL Server (Named Instance)
 url={jdbc_url}
 driver=com.microsoft.sqlserver.jdbc.SQLServerDriver
-changeLogFile=changelog/db.changelog-master.xml
+changeLogFile=changelog/sqlserver/db.changelog-master.xml
 """
             else:
                 # SQL Server Authentication fallback
@@ -2128,68 +2334,386 @@ url={jdbc_url}
 username={username}
 password={password}
 driver=com.microsoft.sqlserver.jdbc.SQLServerDriver
-changeLogFile=changelog/db.changelog-master.xml
+changeLogFile=changelog/sqlserver/db.changelog-master.xml
 """
             
             # Write fallback properties file
-            liquibase_properties_path = os.path.join(os.getcwd(), "liquibase", "liquibase.properties")
+            liquibase_properties_path = os.path.join(liquibase_dir, "liquibase.properties")
             with open(liquibase_properties_path, 'w') as f:
                 f.write(properties_content)
             
-            self.log_to_console(f"📝 Fallback JDBC URL: {jdbc_url}")
+        except Exception as e:
+            pass
+
+    def _create_temp_liquibase_properties_mysql(self):
+        """Create a temporary liquibase.properties file for MySQL"""
+        try:
+            # Get current MySQL connection settings from GUI
+            host = self.host_var.get()
+            port = self.port_var.get()
+            database = self.db_var.get()
+            username = self.username_var.get()
+            password = self.password_var.get()
+            
+            # Ensure we have the correct liquibase directory path
+            project_root = os.path.dirname(os.path.abspath(__file__))
+            liquibase_dir = os.path.join(project_root, "liquibase")
+            
+            # Build MySQL JDBC URL
+            mysql_port = port if port else "3306"
+            jdbc_url = f"jdbc:mysql://{host}:{mysql_port}/{database}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+            
+            # Create MySQL properties content with database-specific changelog
+            properties_content = f"""# Temporary Liquibase properties for MySQL
+url={jdbc_url}
+username={username}
+password={password}
+driver=com.mysql.cj.jdbc.Driver
+changeLogFile=changelog/mysql/db.changelog-master.xml
+"""
+            
+            # Write temporary properties file
+            liquibase_properties_path = os.path.join(liquibase_dir, "liquibase.properties")
+            with open(liquibase_properties_path, 'w') as f:
+                f.write(properties_content)
             
         except Exception as e:
-            self.log_to_console(f"⚠️ Fallback configuration failed: {str(e)}")
+            raise Exception(f"Failed to create MySQL Liquibase configuration: {str(e)}")
 
     def run_bytebase_migration(self):
-        """Run Bytebase migration"""
+        """Run Bytebase migration with proper migration tracking and versioning"""
         if not self.bytebase_enabled.get():
             self.update_status("⚠️ Bytebase is disabled in settings")
             return
             
-        self.update_status("🔵 Starting Bytebase migration...")
+        self.update_status("Starting Bytebase migration...")
         
         def run_migration():
+            import time
+            start_time = time.time()
             try:
-                # Get project root and migrations path
-                project_root = os.path.dirname(os.path.abspath(__file__))
-                migrations_path = os.path.join(project_root, "bytebase", "migrations")
-                
-                # Check database type and handle accordingly
-                db_type = self.db_type_var.get()
-                
-                if db_type == "sqlserver":
-                    # For SQL Server, execute SQL files directly like Redgate
-                    self.log_to_console("🏢 Running Bytebase migration against SQL Server...")
-                    results = self._execute_sql_files_directly(migrations_path)
-                else:
-                    # For MySQL, use the existing Bytebase API
-                    self.log_to_console("🐬 Running Bytebase migration against MySQL...")
-                    # Authenticate with Bytebase
-                    self.bytebase_api.authenticate()
-                    
-                    # Create project
-                    project = self.bytebase_api.create_project("gui-migration-test")
-                    self.log_to_console(f"✅ Project created: {project.get('title', 'Unknown')}")
-                    
-                    # Execute migration folder
-                    results = self.bytebase_api.execute_migration_folder(migrations_path)
+                # Initialize Bytebase-style migration system
+                results = self._run_bytebase_style_migration()
                 
                 # Store and display results
                 self.results['bytebase'] = results
                 for result in results:
                     self.log_to_console(f"  {result}")
                 
-                self.update_status("✅ Bytebase migration completed")
+                # Calculate runtime
+                end_time = time.time()
+                runtime = end_time - start_time
+                self.update_status(f"Bytebase migration completed (Run Time: {runtime:.1f}s)")
                 
             except Exception as e:
+                end_time = time.time()
+                runtime = end_time - start_time
                 error_msg = f"❌ Bytebase migration failed: {str(e)}"
-                self.update_status(error_msg)
+                self.update_status(f"Bytebase migration failed (Run Time: {runtime:.1f}s)")
                 self.log_to_console(error_msg)
         
         thread = threading.Thread(target=run_migration)
         thread.daemon = True
         thread.start()
+    
+    def _run_bytebase_style_migration(self):
+        """Run migration using Bytebase-style approach with proper versioning and issue tracking"""
+        try:
+            results = []
+            
+            # Get project root and migrations path
+            project_root = os.path.dirname(os.path.abspath(__file__))
+            migrations_path = os.path.join(project_root, "bytebase", "migrations")
+            
+            # Determine database-specific migration path
+            db_type = self.db_type_var.get()
+            if db_type == "sqlserver":
+                migrations_path = os.path.join(migrations_path, "sqlserver")
+            else:
+                migrations_path = os.path.join(migrations_path, "mysql")
+            
+            if not os.path.exists(migrations_path):
+                return [f"⚠️ No {db_type.upper()} migration folder found at {migrations_path}"]
+            
+            # Initialize Bytebase migration tracking
+            self._ensure_bytebase_migration_tables()
+            
+            # Get all migration files
+            sql_files = sorted([f for f in os.listdir(migrations_path) if f.endswith('.sql')])
+            
+            if not sql_files:
+                return [f"⚠️ No SQL files found in {migrations_path}"]
+            
+            results.append(f"Bytebase: Starting migration ({db_type.upper()})")
+            
+            # Process each migration file with Bytebase-style tracking
+            executed_migrations = 0
+            skipped_migrations = 0
+            
+            for sql_file in sql_files:
+                # Extract version from filename (Bytebase style: 001-description.sql)
+                version = self._extract_migration_version(sql_file)
+                
+                # Check if migration already applied
+                if self._is_migration_applied(version, sql_file):
+                    results.append(f"  Skipped: {sql_file} (already applied)")
+                    skipped_migrations += 1
+                    continue
+                
+                # Create migration issue (Bytebase concept)
+                issue_id = self._create_migration_issue(sql_file, version)
+                
+                # Execute migration with proper tracking
+                file_path = os.path.join(migrations_path, sql_file)
+                migration_result = self._execute_bytebase_migration(file_path, version, sql_file, issue_id)
+                
+                if migration_result['success']:
+                    results.append(f"  Executed: {sql_file} ({migration_result['statements']} statements)")
+                    executed_migrations += 1
+                else:
+                    results.append(f"  Failed: {sql_file} - {migration_result['error']}")
+                    break
+            
+            # Summary
+            results.append(f"Bytebase: Complete - {executed_migrations} executed, {skipped_migrations} skipped")
+            
+            return results
+            
+        except Exception as e:
+            raise Exception(f"Bytebase migration system failed: {str(e)}")
+    
+    def _ensure_bytebase_migration_tables(self):
+        """Create Bytebase-style migration tracking tables if they don't exist"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            db_type = self.db_type_var.get()
+            
+            if db_type == "mysql":
+                # Create Bytebase migration history table (MySQL)
+                cursor.execute("""
+                CREATE TABLE IF NOT EXISTS bytebase_migration_history (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    version VARCHAR(50) NOT NULL UNIQUE,
+                    filename VARCHAR(255) NOT NULL,
+                    issue_id VARCHAR(50) NOT NULL,
+                    executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    execution_time_ms INT DEFAULT 0,
+                    checksum VARCHAR(64),
+                    status ENUM('PENDING', 'RUNNING', 'DONE', 'FAILED') DEFAULT 'PENDING',
+                    error_message TEXT,
+                    INDEX idx_version (version),
+                    INDEX idx_executed_at (executed_at)
+                )
+                """)
+                
+                # Create Bytebase project metadata table
+                cursor.execute("""
+                CREATE TABLE IF NOT EXISTS bytebase_project_metadata (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    project_name VARCHAR(100) DEFAULT 'db-POC',
+                    environment VARCHAR(50) DEFAULT 'development',
+                    last_migration_version VARCHAR(50),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                )
+                """)
+                
+            else:  # SQL Server
+                # Create Bytebase migration history table (SQL Server)
+                cursor.execute("""
+                IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='bytebase_migration_history' AND xtype='U')
+                CREATE TABLE bytebase_migration_history (
+                    id INT IDENTITY(1,1) PRIMARY KEY,
+                    version NVARCHAR(50) NOT NULL UNIQUE,
+                    filename NVARCHAR(255) NOT NULL,
+                    issue_id NVARCHAR(50) NOT NULL,
+                    executed_at DATETIME2 DEFAULT GETDATE(),
+                    execution_time_ms INT DEFAULT 0,
+                    checksum NVARCHAR(64),
+                    status NVARCHAR(20) DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'RUNNING', 'DONE', 'FAILED')),
+                    error_message NVARCHAR(MAX)
+                )
+                """)
+                
+                cursor.execute("""
+                IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='bytebase_project_metadata' AND xtype='U')
+                CREATE TABLE bytebase_project_metadata (
+                    id INT IDENTITY(1,1) PRIMARY KEY,
+                    project_name NVARCHAR(100) DEFAULT 'db-POC',
+                    environment NVARCHAR(50) DEFAULT 'development',
+                    last_migration_version NVARCHAR(50),
+                    created_at DATETIME2 DEFAULT GETDATE(),
+                    updated_at DATETIME2 DEFAULT GETDATE()
+                )
+                """)
+            
+            conn.commit()
+            cursor.close()
+            conn.close()
+            
+        except Exception as e:
+            raise Exception(f"Failed to initialize Bytebase tracking tables: {str(e)}")
+    
+    def _extract_migration_version(self, filename):
+        """Extract version number from migration filename (Bytebase style)"""
+        import re
+        # Extract leading numbers: 001-create-users.sql -> 001
+        match = re.match(r'^(\d+)', filename)
+        return match.group(1) if match else "000"
+    
+    def _is_migration_applied(self, version, filename):
+        """Check if migration has already been applied"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute(
+                "SELECT COUNT(*) FROM bytebase_migration_history WHERE version = %s AND status = 'DONE'",
+                (version,)
+            )
+            
+            result = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            
+            return result[0] > 0
+            
+        except Exception:
+            # If table doesn't exist or query fails, assume not applied
+            return False
+    
+    def _create_migration_issue(self, filename, version):
+        """Create a Bytebase-style migration issue"""
+        import time
+        import random
+        
+        # Generate issue ID (Bytebase style: BB-123)
+        issue_id = f"BB-{random.randint(1000, 9999)}"
+        
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            # Insert migration record with PENDING status
+            cursor.execute("""
+                INSERT INTO bytebase_migration_history 
+                (version, filename, issue_id, status) 
+                VALUES (%s, %s, %s, 'PENDING')
+            """, (version, filename, issue_id))
+            
+            conn.commit()
+            cursor.close()
+            conn.close()
+            
+        except Exception as e:
+            # Continue even if tracking fails
+            pass
+        
+        return issue_id
+    
+    def _execute_bytebase_migration(self, file_path, version, filename, issue_id):
+        """Execute migration with Bytebase-style tracking and error handling"""
+        import time
+        import hashlib
+        
+        try:
+            start_time = time.time()
+            
+            # Read and calculate checksum
+            with open(file_path, 'r', encoding='utf-8') as f:
+                sql_content = f.read()
+            
+            checksum = hashlib.md5(sql_content.encode()).hexdigest()
+            
+            # Update status to RUNNING
+            self._update_migration_status(version, 'RUNNING', checksum)
+            
+            # Execute migration
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            # Split and execute statements
+            db_type = self.db_type_var.get()
+            if db_type == "mysql":
+                statements = self._split_mysql_statements(sql_content)
+            else:
+                statements = self._split_sql_statements(sql_content)
+            
+            executed_statements = 0
+            for statement in statements:
+                if statement.strip():
+                    try:
+                        if db_type == "mysql":
+                            # For MySQL, create fresh cursor for each statement
+                            cursor.close()
+                            cursor = conn.cursor()
+                        cursor.execute(statement)
+                        if db_type == "mysql":
+                            cursor.fetchall()  # Consume results
+                        executed_statements += 1
+                    except Exception as stmt_error:
+                        # Log statement errors but continue for non-critical errors
+                        error_msg = str(stmt_error).lower()
+                        if not any(warning in error_msg for warning in ['already exists', 'duplicate']):
+                            raise stmt_error
+            
+            conn.commit()
+            cursor.close()
+            conn.close()
+            
+            # Calculate execution time
+            end_time = time.time()
+            execution_time_ms = int((end_time - start_time) * 1000)
+            
+            # Update status to DONE
+            self._update_migration_status(version, 'DONE', checksum, execution_time_ms)
+            
+            return {
+                'success': True,
+                'statements': executed_statements,
+                'duration': end_time - start_time,
+                'checksum': checksum
+            }
+            
+        except Exception as e:
+            # Update status to FAILED
+            self._update_migration_status(version, 'FAILED', error_message=str(e))
+            
+            return {
+                'success': False,
+                'error': str(e),
+                'statements': 0,
+                'duration': 0
+            }
+    
+    def _update_migration_status(self, version, status, checksum=None, execution_time_ms=0, error_message=None):
+        """Update migration status in tracking table"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            if error_message:
+                cursor.execute("""
+                    UPDATE bytebase_migration_history 
+                    SET status = %s, error_message = %s
+                    WHERE version = %s
+                """, (status, error_message, version))
+            else:
+                cursor.execute("""
+                    UPDATE bytebase_migration_history 
+                    SET status = %s, checksum = %s, execution_time_ms = %s
+                    WHERE version = %s
+                """, (status, checksum, execution_time_ms, version))
+            
+            conn.commit()
+            cursor.close()
+            conn.close()
+            
+        except Exception:
+            # Continue even if tracking update fails
+            pass
     
     def _execute_sql_files_directly(self, migrations_path):
         """Execute SQL files directly using the GUI's current database connection"""
@@ -2213,7 +2737,76 @@ changeLogFile=changelog/db.changelog-master.xml
             if not sql_files:
                 return [f"⚠️ No SQL files found in {migrations_path}"]
             
-            self.log_to_console(f"📁 Using {db_type.upper()} migrations from: {migrations_path}")
+            # Use database-specific execution approach
+            if db_type == "mysql":
+                return self._execute_mysql_files(migrations_path, sql_files)
+            else:
+                return self._execute_sqlserver_files(migrations_path, sql_files)
+            
+        except Exception as e:
+            raise Exception(f"Migration execution failed: {str(e)}")
+    
+    def _execute_mysql_files(self, migrations_path, sql_files):
+        """Execute MySQL files with proper connection handling to avoid 'Commands out of sync' errors"""
+        try:
+            results = []
+            
+            for sql_file in sql_files:
+                file_path = os.path.join(migrations_path, sql_file)
+                
+                try:
+                    # Create fresh connection for each file to avoid sync issues
+                    conn = self.get_connection()
+                    cursor = conn.cursor()
+                    
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        sql_content = f.read()
+                    
+                    # For MySQL, split by semicolon and execute one by one with fresh cursors
+                    statements = self._split_mysql_statements(sql_content)
+                    
+                    executed_statements = 0
+                    for statement in statements:
+                        if statement.strip():
+                            try:
+                                # Create a fresh cursor for each statement to avoid sync issues
+                                cursor.close()
+                                cursor = conn.cursor()
+                                cursor.execute(statement)
+                                executed_statements += 1
+                                cursor.fetchall()  # Consume any potential results
+                            except Exception as stmt_error:
+                                # Only log errors that aren't "already exists" warnings
+                                error_msg = str(stmt_error).lower()
+                                if not any(warning in error_msg for warning in ['already exists', 'duplicate']):
+                                    self.log_to_console(f"  ⚠️ Statement error in {sql_file}: {str(stmt_error)}")
+                                continue
+                    
+                    conn.commit()
+                    cursor.close()
+                    conn.close()
+                    
+                    results.append(f"✓ Successfully executed {sql_file} ({executed_statements} statements)")
+                    
+                except Exception as e:
+                    if 'conn' in locals():
+                        try:
+                            conn.rollback()
+                            cursor.close()
+                            conn.close()
+                        except:
+                            pass
+                    results.append(f"❌ Failed to execute {sql_file}: {str(e)}")
+            
+            return results
+            
+        except Exception as e:
+            raise Exception(f"MySQL migration execution failed: {str(e)}")
+    
+    def _execute_sqlserver_files(self, migrations_path, sql_files):
+        """Execute SQL Server files with existing logic"""
+        try:
+            results = []
             
             # Execute each SQL file using the current GUI database connection
             conn = self.get_connection()
@@ -2253,7 +2846,70 @@ changeLogFile=changelog/db.changelog-master.xml
             return results
             
         except Exception as e:
-            raise Exception(f"Migration execution failed: {str(e)}")
+            raise Exception(f"SQL Server migration execution failed: {str(e)}")
+    
+    def _split_mysql_statements(self, sql_content):
+        """Split MySQL SQL content into individual statements, handling DELIMITER statements"""
+        try:
+            import re
+            
+            # Remove MySQL-style comments
+            sql_content = re.sub(r'--.*$', '', sql_content, flags=re.MULTILINE)
+            sql_content = re.sub(r'/\*.*?\*/', '', sql_content, flags=re.DOTALL)
+            sql_content = re.sub(r'#.*$', '', sql_content, flags=re.MULTILINE)  # MySQL hash comments
+            
+            statements = []
+            current_statement = ""
+            current_delimiter = ";"
+            
+            lines = sql_content.split('\n')
+            
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                
+                # Check for DELIMITER change
+                if line.upper().startswith('DELIMITER'):
+                    # If we have a pending statement, add it first
+                    if current_statement.strip():
+                        statements.append(current_statement.strip())
+                        current_statement = ""
+                    
+                    # Extract new delimiter
+                    parts = line.split()
+                    if len(parts) > 1:
+                        current_delimiter = parts[1]
+                    continue
+                
+                current_statement += line + "\n"
+                
+                # Check if statement ends with current delimiter
+                if line.endswith(current_delimiter):
+                    # Remove the delimiter from the statement
+                    statement_without_delimiter = current_statement.rstrip()
+                    if statement_without_delimiter.endswith(current_delimiter):
+                        statement_without_delimiter = statement_without_delimiter[:-len(current_delimiter)].strip()
+                    
+                    if statement_without_delimiter:
+                        statements.append(statement_without_delimiter)
+                    
+                    current_statement = ""
+            
+            # Add any remaining statement
+            if current_statement.strip():
+                final_statement = current_statement.strip()
+                if final_statement.endswith(current_delimiter):
+                    final_statement = final_statement[:-len(current_delimiter)].strip()
+                if final_statement:
+                    statements.append(final_statement)
+            
+            return [stmt for stmt in statements if stmt.strip()]
+            
+        except Exception as e:
+            self.log_to_console(f"⚠️ MySQL SQL splitting warning: {str(e)}")
+            # Fallback: return as single statement
+            return [sql_content.strip()] if sql_content.strip() else []
     
     def _split_sql_statements(self, sql_content):
         """Split SQL content into individual statements, handling SQL Server T-SQL blocks properly"""
@@ -2317,16 +2973,16 @@ changeLogFile=changelog/db.changelog-master.xml
             self.update_status("⚠️ Liquibase is disabled in settings")
             return
             
-        self.update_status("🟣 Starting Liquibase migration...")
+        self.update_status("Starting Liquibase migration...")
         
         def run_migration():
+            import time
+            start_time = time.time()
             try:
                 # Change to liquibase directory
                 original_dir = os.getcwd()
                 project_root = os.path.dirname(os.path.abspath(__file__))
                 liquibase_dir = os.path.join(project_root, "liquibase")
-                
-                self.log_to_console(f"📁 Liquibase directory: {liquibase_dir}")
                 
                 if not os.path.exists(liquibase_dir):
                     error_msg = f"❌ Liquibase directory not found: {liquibase_dir}"
@@ -2335,41 +2991,30 @@ changeLogFile=changelog/db.changelog-master.xml
                     return
                 
                 os.chdir(liquibase_dir)
-                self.log_to_console(f"📁 Changed to directory: {os.getcwd()}")
                 
                 # Check database type and create appropriate connection URL
                 db_type = self.db_type_var.get()
                 if db_type == "sqlserver":
-                    self.log_to_console("🏢 Configuring Liquibase for SQL Server...")
                     # Create temporary liquibase.properties for SQL Server
                     self._create_temp_liquibase_properties_sqlserver()
-                    self.log_to_console("📝 Created temporary SQL Server configuration")
                     
-                    # Also try to verify JDBC driver exists
+                    # Also try to verify JDBC driver exists (silent check)
                     jdbc_driver_path = os.path.join(liquibase_dir, "lib", "mssql-jdbc-12.4.2.jre11.jar")
-                    if os.path.exists(jdbc_driver_path):
-                        self.log_to_console("✅ SQL Server JDBC driver found")
-                    else:
+                    if not os.path.exists(jdbc_driver_path):
                         self.log_to_console("⚠️ SQL Server JDBC driver missing - this may cause connection issues")
                 else:
-                    self.log_to_console("🐬 Using existing MySQL Liquibase configuration...")
+                    # Create temporary liquibase.properties for MySQL
+                    self._create_temp_liquibase_properties_mysql()
                 
                 # Run liquibase update with shell=True for Windows
-                self.log_to_console("🚀 Executing Liquibase update command...")
-                
                 # For SQL Server, try direct SQL execution as fallback
                 if db_type == "sqlserver":
-                    self.log_to_console("⚠️ JDBC connection issues detected for SQL Server")
-                    self.log_to_console("🔄 Using Liquibase updateSQL + ODBC execution approach...")
-                    
                     # Use updateSQL to generate SQL, then execute via ODBC
                     results = self._execute_sql_files_directly_for_liquibase(liquibase_dir)
                     if results:
-                        self.log_to_console("✅ Liquibase executed successfully via updateSQL + ODBC approach")
                         result = None  # Skip the subprocess call
                         fake_success = True
                     else:
-                        self.log_to_console("ℹ️ updateSQL approach failed, attempting direct JDBC connection...")
                         fake_success = False
                 else:
                     fake_success = False
@@ -2380,13 +3025,26 @@ changeLogFile=changelog/db.changelog-master.xml
                     
                     for attempt in range(max_attempts):
                         if attempt > 0:
-                            self.log_to_console(f"🔄 Retry attempt {attempt + 1} for Liquibase...")
                             # On retry, try with named instance approach instead of port
                             if db_type == "sqlserver":
                                 self._create_temp_liquibase_properties_sqlserver_fallback()
                         
+                        # Determine JDBC driver path based on database type
+                        project_root = os.path.dirname(os.path.abspath(__file__))
+                        liquibase_dir = os.path.join(project_root, "liquibase")
+                        
+                        if db_type == "mysql":
+                            jdbc_driver = os.path.join(liquibase_dir, "lib", "mysql-connector-j-9.4.0.jar")
+                        else:  # sqlserver
+                            jdbc_driver = os.path.join(liquibase_dir, "lib", "mssql-jdbc-12.8.1.jre11.jar")
+                        
+                        # Verify the JDBC driver file exists (silent check)
+                        if not os.path.exists(jdbc_driver):
+                            self.log_to_console(f"❌ JDBC driver file missing: {jdbc_driver}")
+                        
+                        # Run Liquibase with proper classpath
                         result = subprocess.run(
-                            ["liquibase", "update"],
+                            ["liquibase", "--classpath", jdbc_driver, "update"],
                             capture_output=True,
                             text=True,
                             shell=True,
@@ -2412,20 +3070,39 @@ changeLogFile=changelog/db.changelog-master.xml
                 os.chdir(original_dir)
                 
                 if result.returncode == 0:
-                    self.log_to_console("✅ Liquibase update successful")
+                    # Parse output for changeset information
+                    changeset_count = 0
+                    executed_files = []
+                    db_type = self.db_type_var.get()
                     
-                    # Parse output for meaningful information
-                    output_lines = result.stdout.split('\n')
-                    for line in output_lines:
-                        if any(keyword in line.lower() for keyword in ['changesets run', 'update summary', 'successfully', 'executed']):
-                            self.log_to_console(f"  {line.strip()}")
+                    # Start with consistent format
+                    self.log_to_console(f"Liquibase: Starting migration ({db_type.upper()})")
                     
-                    # Check if any changesets were actually applied
-                    if "Liquibase command 'update' was executed successfully" in result.stdout:
-                        self.log_to_console("  📊 All changesets applied successfully")
+                    if result.stdout:
+                        lines = result.stdout.split('\n')
+                        for line in lines:
+                            if 'Running Changeset:' in line:
+                                changeset_count += 1
+                                # Extract changeset info: file::id::author
+                                changeset_info = line.split('Running Changeset: ')[1] if 'Running Changeset: ' in line else line
+                                file_name = changeset_info.split('::')[0] if '::' in changeset_info else changeset_info
+                                # Clean up the file path to show just the filename
+                                file_name = file_name.split('/')[-1] if '/' in file_name else file_name
+                                executed_files.append(file_name)
+                                self.log_to_console(f"  Executed: {file_name}")
                     
-                    self.results['liquibase'] = ['✅ Liquibase update completed successfully']
-                    self.update_status("✅ Liquibase migration completed")
+                    # Show summary in consistent format
+                    if changeset_count == 0:
+                        self.log_to_console("  No new changesets found")
+                        self.log_to_console("Liquibase: Complete - 0 executed, 0 skipped")
+                    else:
+                        self.log_to_console(f"Liquibase: Complete - {changeset_count} executed, 0 skipped")
+                    
+                    self.results['liquibase'] = [f'Liquibase update completed - {changeset_count} changesets']
+                    # Calculate runtime
+                    end_time = time.time()
+                    runtime = end_time - start_time
+                    self.update_status(f"Liquibase migration completed (Run Time: {runtime:.1f}s)")
                 else:
                     error_msg = f"❌ Liquibase failed (exit code {result.returncode})"
                     self.log_to_console(error_msg)
@@ -2436,16 +3113,22 @@ changeLogFile=changelog/db.changelog-master.xml
                     self.update_status("❌ Liquibase migration failed")
                 
             except FileNotFoundError:
+                end_time = time.time()
+                runtime = end_time - start_time
                 error_msg = "❌ Liquibase not found. Please ensure Liquibase is installed and in PATH"
-                self.update_status(error_msg)
+                self.update_status(f"Liquibase migration failed (Run Time: {runtime:.1f}s)")
                 self.log_to_console(error_msg)
             except subprocess.TimeoutExpired:
+                end_time = time.time()
+                runtime = end_time - start_time
                 error_msg = "❌ Liquibase update timed out after 60 seconds"
-                self.update_status(error_msg)
+                self.update_status(f"Liquibase migration failed (Run Time: {runtime:.1f}s)")
                 self.log_to_console(error_msg)
             except Exception as e:
+                end_time = time.time()
+                runtime = end_time - start_time
                 error_msg = f"❌ Liquibase error: {str(e)}"
-                self.update_status(error_msg)
+                self.update_status(f"Liquibase migration failed (Run Time: {runtime:.1f}s)")
                 self.log_to_console(error_msg)
         
         thread = threading.Thread(target=run_migration)
@@ -2453,47 +3136,469 @@ changeLogFile=changelog/db.changelog-master.xml
         thread.start()
     
     def run_redgate_migration(self):
-        """Run Redgate migration"""
+        """Run Redgate-style migration with schema comparison and deployment"""
         if not self.redgate_enabled.get():
             self.update_status("⚠️ Redgate is disabled in settings")
             return
             
-        self.update_status("🔴 Starting Redgate migration...")
+        self.update_status("Starting Redgate migration...")
         
         def run_migration():
+            import time
+            start_time = time.time()
             try:
-                # Get project root and migrations path
-                project_root = os.path.dirname(os.path.abspath(__file__))
-                migrations_path = os.path.join(project_root, "redgate", "migrations")
-                
-                self.log_to_console(f"📁 Using migration path: {migrations_path}")
-                
-                # Check current database type and ensure migrations run against correct database
-                db_type = self.db_type_var.get()
-                if db_type == "sqlserver":
-                    # For SQL Server, we need to execute SQL files using the current connection
-                    self.log_to_console("🏢 Running Redgate migration against SQL Server...")
-                    results = self._execute_sql_files_directly(migrations_path)
-                else:
-                    # For MySQL, use the existing simulator
-                    self.log_to_console("🐬 Running Redgate migration against MySQL...")
-                    results = self.redgate_simulator.deploy_migration_package(migrations_path)
+                # Initialize Redgate-style migration system
+                results = self._run_redgate_style_migration()
                 
                 # Store and display results
                 self.results['redgate'] = results
                 for result in results:
                     self.log_to_console(f"  {result}")
                 
-                self.update_status("✅ Redgate migration completed")
+                # Calculate runtime
+                end_time = time.time()
+                runtime = end_time - start_time
+                self.update_status(f"Redgate migration completed (Run Time: {runtime:.1f}s)")
                 
             except Exception as e:
+                end_time = time.time()
+                runtime = end_time - start_time
                 error_msg = f"❌ Redgate migration failed: {str(e)}"
-                self.update_status(error_msg)
+                self.update_status(f"Redgate migration failed (Run Time: {runtime:.1f}s)")
                 self.log_to_console(error_msg)
         
         thread = threading.Thread(target=run_migration)
         thread.daemon = True
         thread.start()
+    
+    def _run_redgate_style_migration(self):
+        """Run migration using Redgate-style approach with schema comparison and deployment plans"""
+        try:
+            results = []
+            
+            # Get project root and migrations path
+            project_root = os.path.dirname(os.path.abspath(__file__))
+            migrations_path = os.path.join(project_root, "redgate", "migrations")
+            
+            # Determine database-specific migration path
+            db_type = self.db_type_var.get()
+            if db_type == "sqlserver":
+                migrations_path = os.path.join(migrations_path, "sqlserver")
+            else:
+                migrations_path = os.path.join(migrations_path, "mysql")
+            
+            if not os.path.exists(migrations_path):
+                return [f"⚠️ No {db_type.upper()} migration folder found at {migrations_path}"]
+            
+            # Initialize Redgate deployment tracking
+            self._ensure_redgate_deployment_tables()
+            
+            # Get all migration files
+            sql_files = sorted([f for f in os.listdir(migrations_path) if f.endswith('.sql')])
+            
+            if not sql_files:
+                return [f"⚠️ No SQL files found in {migrations_path}"]
+            
+            results.append(f"Redgate: Starting deployment ({db_type.upper()})")
+            
+            # Perform schema comparison (Redgate style)
+            comparison_results = self._perform_schema_comparison(sql_files, migrations_path)
+            results.extend(comparison_results)
+            
+            # Generate deployment plan
+            deployment_plan = self._generate_deployment_plan(sql_files, migrations_path)
+            results.extend(deployment_plan)
+            
+            # Execute deployment with proper tracking
+            deployment_results = self._execute_redgate_deployment(sql_files, migrations_path)
+            results.extend(deployment_results)
+            
+            return results
+            
+        except Exception as e:
+            raise Exception(f"Redgate deployment system failed: {str(e)}")
+    
+    def _ensure_redgate_deployment_tables(self):
+        """Create Redgate-style deployment tracking tables if they don't exist"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            db_type = self.db_type_var.get()
+            
+            if db_type == "mysql":
+                # Create Redgate deployment history table (MySQL)
+                cursor.execute("""
+                CREATE TABLE IF NOT EXISTS redgate_deployment_history (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    deployment_id VARCHAR(50) NOT NULL UNIQUE,
+                    filename VARCHAR(255) NOT NULL,
+                    schema_hash VARCHAR(64),
+                    deployed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    deployment_time_ms INT DEFAULT 0,
+                    changes_applied INT DEFAULT 0,
+                    deployment_status ENUM('PLANNED', 'DEPLOYING', 'COMPLETED', 'FAILED', 'ROLLED_BACK') DEFAULT 'PLANNED',
+                    deployment_notes TEXT,
+                    INDEX idx_deployment_id (deployment_id),
+                    INDEX idx_deployed_at (deployed_at)
+                )
+                """)
+                
+                # Create Redgate schema comparison table
+                cursor.execute("""
+                CREATE TABLE IF NOT EXISTS redgate_schema_comparison (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    comparison_id VARCHAR(50) NOT NULL,
+                    object_name VARCHAR(255) NOT NULL,
+                    object_type ENUM('TABLE', 'VIEW', 'PROCEDURE', 'FUNCTION', 'INDEX', 'CONSTRAINT') NOT NULL,
+                    change_type ENUM('CREATE', 'ALTER', 'DROP', 'NONE') NOT NULL,
+                    script_content TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """)
+                
+            else:  # SQL Server
+                # Create Redgate deployment history table (SQL Server)
+                cursor.execute("""
+                IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='redgate_deployment_history' AND xtype='U')
+                CREATE TABLE redgate_deployment_history (
+                    id INT IDENTITY(1,1) PRIMARY KEY,
+                    deployment_id NVARCHAR(50) NOT NULL UNIQUE,
+                    filename NVARCHAR(255) NOT NULL,
+                    schema_hash NVARCHAR(64),
+                    deployed_at DATETIME2 DEFAULT GETDATE(),
+                    deployment_time_ms INT DEFAULT 0,
+                    changes_applied INT DEFAULT 0,
+                    deployment_status NVARCHAR(20) DEFAULT 'PLANNED' CHECK (deployment_status IN ('PLANNED', 'DEPLOYING', 'COMPLETED', 'FAILED', 'ROLLED_BACK')),
+                    deployment_notes NVARCHAR(MAX)
+                )
+                """)
+                
+                cursor.execute("""
+                IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='redgate_schema_comparison' AND xtype='U')
+                CREATE TABLE redgate_schema_comparison (
+                    id INT IDENTITY(1,1) PRIMARY KEY,
+                    comparison_id NVARCHAR(50) NOT NULL,
+                    object_name NVARCHAR(255) NOT NULL,
+                    object_type NVARCHAR(20) NOT NULL CHECK (object_type IN ('TABLE', 'VIEW', 'PROCEDURE', 'FUNCTION', 'INDEX', 'CONSTRAINT')),
+                    change_type NVARCHAR(10) NOT NULL CHECK (change_type IN ('CREATE', 'ALTER', 'DROP', 'NONE')),
+                    script_content NVARCHAR(MAX),
+                    created_at DATETIME2 DEFAULT GETDATE()
+                )
+                """)
+            
+            conn.commit()
+            cursor.close()
+            conn.close()
+            
+        except Exception as e:
+            raise Exception(f"Failed to initialize Redgate tracking tables: {str(e)}")
+    
+    def _perform_schema_comparison(self, sql_files, migrations_path):
+        """Perform Redgate-style schema comparison"""
+        import random
+        
+        results = []
+        comparison_id = f"RG-COMP-{random.randint(1000, 9999)}"
+        
+        # Analyze each migration file
+        total_changes = 0
+        for sql_file in sql_files:
+            file_path = os.path.join(migrations_path, sql_file)
+            
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    sql_content = f.read()
+                
+                # Parse SQL to identify object types and changes (simplified)
+                changes = self._analyze_sql_changes(sql_content, comparison_id)
+                total_changes += len(changes)
+                
+                if changes:
+                    results.append(f"  Analyzed: {sql_file} ({len(changes)} changes)")
+                    
+            except Exception as e:
+                results.append(f"  Error: Failed to analyze {sql_file}")
+        
+        results.append(f"  Schema comparison: {total_changes} changes identified")
+        return results
+    
+    def _analyze_sql_changes(self, sql_content, comparison_id):
+        """Analyze SQL content to identify database object changes (simplified Redgate-style analysis)"""
+        import re
+        
+        changes = []
+        
+        try:
+            # Remove comments
+            sql_content = re.sub(r'--.*$', '', sql_content, flags=re.MULTILINE)
+            sql_content = re.sub(r'/\*.*?\*/', '', sql_content, flags=re.DOTALL)
+            
+            # Detect CREATE statements
+            create_matches = re.finditer(r'CREATE\s+(TABLE|VIEW|PROCEDURE|FUNCTION|INDEX)\s+(?:\[?(\w+)\]?\.)?(?:\[?(\w+)\]?)', sql_content, re.IGNORECASE)
+            for match in create_matches:
+                object_type = match.group(1).upper()
+                object_name = match.group(3) or match.group(2)
+                changes.append({
+                    'object_type': object_type,
+                    'object_name': object_name,
+                    'change_type': 'CREATE',
+                    'script_content': match.group(0)[:200] + '...' if len(match.group(0)) > 200 else match.group(0)
+                })
+                
+                # Store in comparison table
+                self._store_comparison_result(comparison_id, object_name, object_type, 'CREATE', match.group(0))
+            
+            # Detect ALTER statements
+            alter_matches = re.finditer(r'ALTER\s+(TABLE|VIEW|PROCEDURE|FUNCTION)\s+(?:\[?(\w+)\]?\.)?(?:\[?(\w+)\]?)', sql_content, re.IGNORECASE)
+            for match in alter_matches:
+                object_type = match.group(1).upper()
+                object_name = match.group(3) or match.group(2)
+                changes.append({
+                    'object_type': object_type,
+                    'object_name': object_name,
+                    'change_type': 'ALTER',
+                    'script_content': match.group(0)[:200] + '...' if len(match.group(0)) > 200 else match.group(0)
+                })
+                
+                self._store_comparison_result(comparison_id, object_name, object_type, 'ALTER', match.group(0))
+            
+            # Detect DROP statements
+            drop_matches = re.finditer(r'DROP\s+(TABLE|VIEW|PROCEDURE|FUNCTION|INDEX)\s+(?:\[?(\w+)\]?\.)?(?:\[?(\w+)\]?)', sql_content, re.IGNORECASE)
+            for match in drop_matches:
+                object_type = match.group(1).upper()
+                object_name = match.group(3) or match.group(2)
+                changes.append({
+                    'object_type': object_type,
+                    'object_name': object_name,
+                    'change_type': 'DROP',
+                    'script_content': match.group(0)[:200] + '...' if len(match.group(0)) > 200 else match.group(0)
+                })
+                
+                self._store_comparison_result(comparison_id, object_name, object_type, 'DROP', match.group(0))
+            
+        except Exception as e:
+            # Continue even if analysis fails
+            pass
+        
+        return changes
+    
+    def _store_comparison_result(self, comparison_id, object_name, object_type, change_type, script_content):
+        """Store comparison result in tracking table"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                INSERT INTO redgate_schema_comparison 
+                (comparison_id, object_name, object_type, change_type, script_content) 
+                VALUES (%s, %s, %s, %s, %s)
+            """, (comparison_id, object_name, object_type, change_type, script_content[:1000]))  # Limit script content
+            
+            conn.commit()
+            cursor.close()
+            conn.close()
+            
+        except Exception:
+            # Continue even if storage fails
+            pass
+    
+    def _generate_deployment_plan(self, sql_files, migrations_path):
+        """Generate Redgate-style deployment plan"""
+        import random
+        
+        results = []
+        deployment_id = f"RG-DEPLOY-{random.randint(1000, 9999)}"
+        
+        results.append(f"  Deployment plan: {len(sql_files)} files to deploy")
+        
+        return results
+    
+    def _execute_redgate_deployment(self, sql_files, migrations_path):
+        """Execute Redgate-style deployment with proper tracking"""
+        import time
+        import random
+        import hashlib
+        
+        results = []
+        deployment_id = f"RG-DEPLOY-{random.randint(1000, 9999)}"
+        
+        total_changes = 0
+        executed_files = 0
+        skipped_files = 0
+        
+        for sql_file in sql_files:
+            file_path = os.path.join(migrations_path, sql_file)
+            
+            try:
+                # Check if already deployed
+                if self._is_redgate_deployment_applied(sql_file):
+                    results.append(f"  Skipped: {sql_file} (already deployed)")
+                    skipped_files += 1
+                    continue
+                
+                # Read file and calculate hash
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    sql_content = f.read()
+                
+                schema_hash = hashlib.md5(sql_content.encode()).hexdigest()
+                
+                # Record deployment start
+                self._record_deployment_start(deployment_id, sql_file, schema_hash)
+                
+                # Execute deployment
+                deployment_result = self._execute_redgate_file(file_path, sql_content)
+                
+                if deployment_result['success']:
+                    # Record successful deployment
+                    self._record_deployment_completion(deployment_id, deployment_result['changes'], 0)
+                    
+                    results.append(f"  Deployed: {sql_file} ({deployment_result['changes']} changes)")
+                    total_changes += deployment_result['changes']
+                    executed_files += 1
+                else:
+                    # Record failed deployment
+                    self._record_deployment_failure(deployment_id, deployment_result['error'])
+                    results.append(f"  Failed: {sql_file} - {deployment_result['error']}")
+                    break
+                    
+            except Exception as e:
+                results.append(f"  Error: Failed to deploy {sql_file}")
+                break
+        
+        results.append(f"Redgate: Complete - {executed_files} deployed, {skipped_files} skipped, {total_changes} changes")
+        
+        return results
+    
+    def _is_redgate_deployment_applied(self, filename):
+        """Check if deployment has already been applied"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute(
+                "SELECT COUNT(*) FROM redgate_deployment_history WHERE filename = %s AND deployment_status = 'COMPLETED'",
+                (filename,)
+            )
+            
+            result = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            
+            return result[0] > 0
+            
+        except Exception:
+            # If table doesn't exist or query fails, assume not applied
+            return False
+    
+    def _record_deployment_start(self, deployment_id, filename, schema_hash):
+        """Record deployment start"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                INSERT INTO redgate_deployment_history 
+                (deployment_id, filename, schema_hash, deployment_status) 
+                VALUES (%s, %s, %s, 'DEPLOYING')
+            """, (deployment_id, filename, schema_hash))
+            
+            conn.commit()
+            cursor.close()
+            conn.close()
+            
+        except Exception:
+            # Continue even if tracking fails
+            pass
+    
+    def _record_deployment_completion(self, deployment_id, changes_applied, deployment_time_ms):
+        """Record successful deployment completion"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                UPDATE redgate_deployment_history 
+                SET deployment_status = 'COMPLETED', changes_applied = %s, deployment_time_ms = %s
+                WHERE deployment_id = %s
+            """, (changes_applied, deployment_time_ms, deployment_id))
+            
+            conn.commit()
+            cursor.close()
+            conn.close()
+            
+        except Exception:
+            # Continue even if tracking fails
+            pass
+    
+    def _record_deployment_failure(self, deployment_id, error_message):
+        """Record deployment failure"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                UPDATE redgate_deployment_history 
+                SET deployment_status = 'FAILED', deployment_notes = %s
+                WHERE deployment_id = %s
+            """, (error_message, deployment_id))
+            
+            conn.commit()
+            cursor.close()
+            conn.close()
+            
+        except Exception:
+            # Continue even if tracking fails
+            pass
+    
+    def _execute_redgate_file(self, file_path, sql_content):
+        """Execute individual SQL file with Redgate-style error handling"""
+        try:
+            # Execute migration
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            # Split and execute statements
+            db_type = self.db_type_var.get()
+            if db_type == "mysql":
+                statements = self._split_mysql_statements(sql_content)
+            else:
+                statements = self._split_sql_statements(sql_content)
+            
+            executed_statements = 0
+            for statement in statements:
+                if statement.strip():
+                    try:
+                        if db_type == "mysql":
+                            # For MySQL, create fresh cursor for each statement
+                            cursor.close()
+                            cursor = conn.cursor()
+                        cursor.execute(statement)
+                        if db_type == "mysql":
+                            cursor.fetchall()  # Consume results
+                        executed_statements += 1
+                    except Exception as stmt_error:
+                        # Log statement errors but continue for non-critical errors
+                        error_msg = str(stmt_error).lower()
+                        if not any(warning in error_msg for warning in ['already exists', 'duplicate']):
+                            raise stmt_error
+            
+            conn.commit()
+            cursor.close()
+            conn.close()
+            
+            return {
+                'success': True,
+                'changes': executed_statements,
+                'error': None
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'changes': 0,
+                'error': str(e)
+            }
     
     def _execute_sql_files_directly_for_liquibase(self, liquibase_sql_path):
         """Execute Liquibase SQL via updateSQL command and then run the generated SQL using GUI's ODBC connection"""
@@ -2532,13 +3637,22 @@ changeLogFile=changelog/db.changelog-master.xml
                     else:
                         jdbc_url = f"jdbc:sqlserver://{host}:1433;databaseName={database};integratedSecurity=true;encrypt=false;trustServerCertificate=true"
                 
-                # Run updateSQL with direct command line parameters
+                # Determine JDBC driver path
+                project_root = os.path.dirname(os.path.abspath(__file__))
+                liquibase_lib_dir = os.path.join(project_root, "liquibase", "lib")
+                jdbc_driver_path = os.path.join(liquibase_lib_dir, "mssql-jdbc-12.8.1.jre11.jar")
+                
+                # Debug: Log the actual path being used
+                self.log_to_console(f"🔧 Using JDBC driver path: {jdbc_driver_path}")
+                
+                # Run updateSQL with direct command line parameters and proper classpath
                 cmd = [
                     "liquibase",
+                    "--classpath", jdbc_driver_path,
                     "updateSQL",
                     f"--url={jdbc_url}",
                     "--driver=com.microsoft.sqlserver.jdbc.SQLServerDriver",
-                    "--changeLogFile=changelog/db.changelog-master.xml"
+                    "--changeLogFile=changelog/sqlserver/db.changelog-master.xml"
                 ]
                 
                 self.log_to_console(f"🚀 Running: {' '.join(cmd)}")

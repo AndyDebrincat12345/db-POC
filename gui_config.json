@@ -1,9 +1,9 @@
 {
-  "db_type": "sqlserver",
-  "host": "localhost\\SQLEXPRESS",
-  "port": "1433",
-  "database": "MigrationPOC",
+  "db_type": "mysql",
+  "host": "localhost",
+  "port": "3306",
+  "database": "status_poc",
   "username": "root",
-  "password": "",
+  "password": "eyroot",
   "trusted_connection": true
 }

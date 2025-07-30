@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+
+    <changeSet id="sqlserver-roles-1" author="poc-team">
+        <!-- Roles table for SQL Server -->
+        <createTable tableName="roles">
+            <column name="id" type="INT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="name" type="NVARCHAR(50)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="description" type="NVARCHAR(MAX)"/>
+            <column name="created_at" type="DATETIME2" defaultValueComputed="GETDATE()"/>
+        </createTable>
+
+        <!-- Permissions table for SQL Server -->
+        <createTable tableName="permissions">
+            <column name="id" type="INT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="name" type="NVARCHAR(50)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="resource" type="NVARCHAR(100)"/>
+            <column name="action" type="NVARCHAR(50)"/>
+            <column name="created_at" type="DATETIME2" defaultValueComputed="GETDATE()"/>
+        </createTable>
+
+        <!-- User roles junction table -->
+        <createTable tableName="user_roles">
+            <column name="user_id" type="INT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="role_id" type="INT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="assigned_at" type="DATETIME2" defaultValueComputed="GETDATE()"/>
+        </createTable>
+
+        <!-- Foreign key constraints -->
+        <addForeignKeyConstraint baseTableName="user_roles" baseColumnNames="user_id"
+                                constraintName="fk_user_roles_user"
+                                referencedTableName="users_comprehensive" referencedColumnNames="id"/>
+        
+        <addForeignKeyConstraint baseTableName="user_roles" baseColumnNames="role_id"
+                                constraintName="fk_user_roles_role"
+                                referencedTableName="roles" referencedColumnNames="id"/>
+
+        <!-- Primary key for junction table -->
+        <addPrimaryKey tableName="user_roles" columnNames="user_id,role_id"/>
+    </changeSet>
+
+</databaseChangeLog>
