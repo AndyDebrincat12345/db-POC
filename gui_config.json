@@ -1,0 +1,9 @@
+{
+  "db_type": "sqlserver",
+  "host": "localhost\\SQLEXPRESS",
+  "port": "1433",
+  "database": "MigrationPOC",
+  "username": "root",
+  "password": "",
+  "trusted_connection": true
+}
