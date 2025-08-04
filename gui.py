@@ -253,7 +253,7 @@ class ProfessionalMigrationGUI:
         tk.Label(header_frame,
                 text="🚀 Database Migration Tools Comparison",
                 font=('Segoe UI', 18, 'bold'),
-                bg='#ffd700', fg='#2c3e50').pack(expand=True)
+                bg='#ffd7git00', fg='#2c3e50').pack(expand=True)
         
         # Tools grid
         tools_grid = tk.Frame(scrollable_frame, bg='white')
