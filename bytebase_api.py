@@ -202,6 +202,10 @@ class BytebaseAPI:
                 "state": "SIMULATED"
             }
     
+    def run_migrations(self, folder_path):
+        """Run migrations from a folder - main entry point for GUI integration"""
+        return self.execute_migration_folder(folder_path)
+    
     def execute_migration_folder(self, folder_path):
         """Execute all SQL files in a folder through Bytebase"""
         try:

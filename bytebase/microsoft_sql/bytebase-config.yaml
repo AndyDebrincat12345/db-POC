@@ -1,0 +1,23 @@
+# Bytebase Enterprise Configuration - Microsoft SQL Server
+name: enterprise-migration-poc-sqlserver
+environment: development
+description: "Professional database migration tool comparison - SQL Server"
+
+database:
+  type: sqlserver
+  host: localhost
+  port: 1433
+  username: sa
+  database: status_poc
+  
+migrations:
+  folder: migrations
+  order: filename
+  validation: true
+  backup_before_deploy: true
+  
+enterprise_features:
+  sql_review: enabled
+  approval_workflow: enabled
+  audit_logging: enabled
+  schema_drift_detection: enabled

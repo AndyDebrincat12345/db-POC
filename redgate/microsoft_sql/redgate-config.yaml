@@ -1,0 +1,32 @@
+# Redgate SQL Source Control Configuration - Microsoft SQL Server
+project_name: "Enterprise Database Migration POC - SQL Server"
+project_type: "sql_source_control"
+
+database:
+  host: ${DB_HOST}
+  port: ${DB_PORT}
+  user: ${DB_USER}
+  password: ${DB_PASS}
+  name: ${DB_NAME}
+  type: "sqlserver"
+
+migrations:
+  folder: ./migrations
+  file_extension: .sql
+  deployment_method: "schema_compare"
+  backup_before_deploy: true
+  transaction_per_script: true
+
+redgate_features:
+  schema_compare: enabled
+  data_compare: enabled
+  deployment_manager: enabled
+  source_control_integration: enabled
+  change_automation: enabled
+
+metadata:
+  tool: "Redgate SQL Source Control"
+  version: "Professional"
+  description: "Enterprise-grade schema management and deployment"
+  team: "Database Engineering Team"
+  created_date: "2025-07-29"
