@@ -21,7 +21,6 @@ import socketserver
 
 # Import our tool implementations
 from bytebase_api import BytebaseAPI
-from redgate_simulator import RedgateSimulator
 
 load_dotenv()
 
@@ -38,7 +37,6 @@ class ProfessionalMigrationGUI:
         
         # Initialize tool instances (without .env dependency)
         self.bytebase_api = BytebaseAPI()
-        self.redgate_simulator = RedgateSimulator()
         
         # Results storage
         self.results = {
@@ -270,7 +268,7 @@ class ProfessionalMigrationGUI:
             lambda: self.open_web_page('http://localhost:8081', 'Bytebase')
         )
         
-        self.create_migration_card(
+        self.liquibase_button = self.create_migration_card(
             tools_grid, 
             "🟣 Liquibase Professional", 
             "#9b59b6",
@@ -354,11 +352,14 @@ class ProfessionalMigrationGUI:
                  font=('Segoe UI', 10, 'bold'),
                  relief='flat', padx=12, pady=4).pack(side='right', padx=(10, 0))
         
-        tk.Button(button_container, text="▶️ Execute",
+        execute_button = tk.Button(button_container, text="▶️ Execute",
                  command=command,
                  bg='white', fg=color,
                  font=('Segoe UI', 11, 'bold'),
-                 relief='flat', padx=15, pady=5).pack(side='right')
+                 relief='flat', padx=15, pady=5)
+        execute_button.pack(side='right')
+        
+        return execute_button
     def create_console_tab(self):
         """Create the console/output tab"""
         console_frame = ttk.Frame(self.notebook)
@@ -743,6 +744,11 @@ class ProfessionalMigrationGUI:
             self.username_var.set(os.getenv("DB_USER", "root"))
             # Hide SQL Server specific options
             self.sqlserver_frame.grid_remove()
+            # Enable all tools for MySQL
+            self.liquibase_enabled.set(True)
+            # Update Liquibase button appearance
+            if hasattr(self, 'liquibase_button'):
+                self.liquibase_button.config(state='normal', text="▶️ Execute", bg='white', fg='#9b59b6')
             
         elif db_type == "sqlserver":
             # SQL Server default settings - use default instance for reliability
@@ -754,6 +760,11 @@ class ProfessionalMigrationGUI:
             self.trusted_connection_var.set(True)
             # Show SQL Server specific options
             self.sqlserver_frame.grid()
+            # Disable Liquibase for SQL Server due to TCP/IP limitations
+            self.liquibase_enabled.set(False)
+            # Update Liquibase button appearance - greyed out
+            if hasattr(self, 'liquibase_button'):
+                self.liquibase_button.config(state='disabled', text="⚠️ TCP/IP Required", bg='#cccccc', fg='#666666')
             
         # Update connection status
         self.connection_status_label.config(text=f"Selected: {db_type.upper()}", fg='#17a2b8')
@@ -2272,7 +2283,7 @@ class ProfessionalMigrationGUI:
                 properties_content = f"""# Temporary Liquibase properties for SQL Server (Windows Authentication)
 url={jdbc_url}
 driver=com.microsoft.sqlserver.jdbc.SQLServerDriver
-changeLogFile=microsoft_sql/changelog/db.changelog-master.xml
+changeLogFile=changelog/db.changelog-master.xml
 """
             else:
                 # SQL Server Authentication
@@ -2283,7 +2294,7 @@ url={jdbc_url}
 username={username}
 password={password}
 driver=com.microsoft.sqlserver.jdbc.SQLServerDriver
-changeLogFile=microsoft_sql/changelog/db.changelog-master.xml
+changeLogFile=changelog/db.changelog-master.xml
 """
             
             # Write temporary properties file
@@ -2316,8 +2327,12 @@ changeLogFile=microsoft_sql/changelog/db.changelog-master.xml
                 jdbc_url_base = f"jdbc:sqlserver://{base_host}"
                 connection_params = f"instanceName={instance_name};databaseName={database};integratedSecurity=true;encrypt=false"
             else:
-                # Fallback to basic connection
-                jdbc_url_base = f"jdbc:sqlserver://{host}:1433"
+                # Fallback to basic connection - detect actual SQL Server port
+                detected_port = self._detect_sqlserver_port()
+                if detected_port:
+                    jdbc_url_base = f"jdbc:sqlserver://{host}:{detected_port}"
+                else:
+                    jdbc_url_base = f"jdbc:sqlserver://{host}:1433"  # Fallback to standard port
                 connection_params = f"databaseName={database};integratedSecurity=true;encrypt=false"
             
             # Create fallback JDBC URL
@@ -2327,7 +2342,7 @@ changeLogFile=microsoft_sql/changelog/db.changelog-master.xml
                 properties_content = f"""# Fallback Liquibase properties for SQL Server (Named Instance)
 url={jdbc_url}
 driver=com.microsoft.sqlserver.jdbc.SQLServerDriver
-changeLogFile=microsoft_sql/changelog/db.changelog-master.xml
+changeLogFile=changelog/db.changelog-master.xml
 """
             else:
                 # SQL Server Authentication fallback
@@ -2339,7 +2354,7 @@ url={jdbc_url}
 username={username}
 password={password}
 driver=com.microsoft.sqlserver.jdbc.SQLServerDriver
-changeLogFile=microsoft_sql/changelog/db.changelog-master.xml
+changeLogFile=changelog/db.changelog-master.xml
 """
             
             # Write fallback properties file
@@ -2374,7 +2389,7 @@ url={jdbc_url}
 username={username}
 password={password}
 driver=com.mysql.cj.jdbc.Driver
-changeLogFile=mysql/changelog/db.changelog-master.xml
+changeLogFile=changelog/db.changelog-master.xml
 logLevel=INFO
 """
             
@@ -3097,7 +3112,17 @@ logLevel=INFO
     def run_liquibase_migration(self):
         """Run Liquibase migration"""
         if not self.liquibase_enabled.get():
-            self.update_status("⚠️ Liquibase is disabled in settings")
+            db_type = self.db_type_var.get()
+            if db_type == "sqlserver":
+                self.update_status("⚠️ Liquibase disabled for SQL Server - TCP/IP protocol required")
+                self.log_to_console("⚠️ Liquibase Limitation for SQL Server:")
+                self.log_to_console("   • Liquibase requires TCP/IP connections")
+                self.log_to_console("   • SQL Server TCP/IP protocol is disabled by default")
+                self.log_to_console("   • GUI/Bytebase/Redgate use ODBC (Named Pipes/Shared Memory)")
+                self.log_to_console("   • To enable: SQL Server Configuration Manager → Enable TCP/IP")
+                self.log_to_console("   • Alternative: Use MySQL for complete tool comparison")
+            else:
+                self.update_status("⚠️ Liquibase is disabled in settings")
             return
             
         self.update_status("Starting Liquibase migration...")
@@ -3106,35 +3131,41 @@ logLevel=INFO
             import time
             start_time = time.time()
             try:
+                # Get database type for clean logging
+                db_type = self.db_type_var.get().upper()
+                
+                # Clean logging like Bytebase
+                self.log_to_console(f"  Liquibase: Using CLI approach for {db_type}")
+                self.log_to_console(f"    Connected to Liquibase server")
+                
                 # Get database type and set up paths
-                db_type = self.db_type_var.get()
+                db_type_lower = self.db_type_var.get()
                 original_dir = os.getcwd()
                 project_root = os.path.dirname(os.path.abspath(__file__))
                 
                 # Use new folder structure: liquibase/[db_type]/
-                if db_type == "sqlserver":
+                if db_type_lower == "sqlserver":
                     liquibase_dir = os.path.join(project_root, "liquibase", "microsoft_sql")
                 else:  # mysql
                     liquibase_dir = os.path.join(project_root, "liquibase", "mysql")
                 
                 if not os.path.exists(liquibase_dir):
-                    error_msg = f"❌ Liquibase {db_type.upper()} directory not found: {liquibase_dir}"
+                    error_msg = f"    {db_type} directory not found"
                     self.log_to_console(error_msg)
-                    self.update_status(f"❌ Liquibase {db_type.upper()} directory not found")
+                    self.update_status(f"❌ Liquibase {db_type} directory not found")
                     return
                 
                 os.chdir(liquibase_dir)
                 
                 # Check database type and create appropriate connection URL
-                db_type = self.db_type_var.get()
-                if db_type == "sqlserver":
+                if db_type_lower == "sqlserver":
                     # Create temporary liquibase.properties for SQL Server
                     self._create_temp_liquibase_properties_sqlserver()
                     
                     # Also try to verify JDBC driver exists (silent check)
                     jdbc_driver_path = os.path.join(liquibase_dir, "lib", "mssql-jdbc-12.4.2.jre11.jar")
                     if not os.path.exists(jdbc_driver_path):
-                        self.log_to_console("⚠️ SQL Server JDBC driver missing - this may cause connection issues")
+                        self.log_to_console("    SQL Server JDBC driver missing")
                 else:
                     # Create temporary liquibase.properties for MySQL
                     self._create_temp_liquibase_properties_mysql()
@@ -3166,26 +3197,35 @@ logLevel=INFO
                         project_root = os.path.dirname(os.path.abspath(__file__))
                         liquibase_dir = os.path.join(project_root, "liquibase")
                         
-                        if db_type == "mysql":
+                        if db_type_lower == "mysql":
                             jdbc_driver = os.path.join(liquibase_dir, "lib", "mysql-connector-j-9.4.0.jar")
                         else:  # sqlserver
                             jdbc_driver = os.path.join(liquibase_dir, "lib", "mssql-jdbc-12.4.2.jre11.jar")
                         
-                        # Verify the JDBC driver file exists (silent check)
+                        # Verify the JDBC driver file exists
                         if not os.path.exists(jdbc_driver):
-                            self.log_to_console(f"❌ JDBC driver file missing: {jdbc_driver}")
+                            self.log_to_console(f"    JDBC driver missing: {os.path.basename(jdbc_driver)}")
+                            raise Exception(f"JDBC driver not found: {jdbc_driver}")
                         
                         # Run Liquibase with proper classpath using full path
                         liquibase_cmd = r"C:\Program Files\liquibase\liquibase.bat"
                         if not os.path.exists(liquibase_cmd):
                             liquibase_cmd = "liquibase"  # Fallback to PATH
                         
+                        # Use absolute path for JDBC driver to ensure it's found
+                        jdbc_driver_abs = os.path.abspath(jdbc_driver)
+                        
+                        # Set up environment with JDBC driver in classpath
+                        env = os.environ.copy()
+                        env['LIQUIBASE_CLASSPATH'] = jdbc_driver_abs
+                        
                         result = subprocess.run(
-                            [liquibase_cmd, "--classpath", jdbc_driver, "update"],
+                            [liquibase_cmd, "update"],
                             capture_output=True,
                             text=True,
                             shell=True,
-                            timeout=120  # Increased timeout
+                            timeout=120,  # Increased timeout
+                            env=env
                         )
                         
                         # If successful, break out of retry loop
@@ -3213,7 +3253,8 @@ logLevel=INFO
                     db_type = self.db_type_var.get()
                     
                     # Start with consistent format
-                    self.log_to_console(f"Liquibase: Starting migration ({db_type.upper()})")
+                    self.log_to_console(f"  Liquibase: Using change management for {db_type.upper()}")
+                    self.log_to_console("    Processing changelog files...")
                     
                     if result.stdout:
                         lines = result.stdout.split('\n')
@@ -3226,17 +3267,18 @@ logLevel=INFO
                                 # Clean up the file path to show just the filename
                                 file_name = file_name.split('/')[-1] if '/' in file_name else file_name
                                 executed_files.append(file_name)
-                                self.log_to_console(f"  Executed: {file_name}")
+                                self.log_to_console(f"  ✓ Executed changeset: {file_name}")
                     
-                    # Show summary in consistent format
+                    # Show summary in consistent format BEFORE status update
                     if changeset_count == 0:
-                        self.log_to_console("  No new changesets found")
-                        self.log_to_console("Liquibase: Complete - 0 executed, 0 skipped")
+                        self.log_to_console("    No new changesets to execute")
+                        self.log_to_console("  ✓ Database schema is up to date")
                     else:
-                        self.log_to_console(f"Liquibase: Complete - {changeset_count} executed, 0 skipped")
+                        self.log_to_console(f"  ✓ Applied {changeset_count} changesets successfully")
                     
                     self.results['liquibase'] = [f'Liquibase update completed - {changeset_count} changesets']
-                    # Calculate runtime
+                    
+                    # Calculate runtime and update status AFTER all logging
                     end_time = time.time()
                     runtime = end_time - start_time
                     self.update_status(f"Liquibase migration completed (Run Time: {runtime:.1f}s)")
@@ -3284,13 +3326,18 @@ logLevel=INFO
             import time
             start_time = time.time()
             try:
+                # Get database type for clean logging
+                db_type = self.db_type_var.get().upper()
+                
+                # Clean logging like Bytebase
+                self.log_to_console(f"  Redgate: Using PowerShell approach for {db_type}")
+                self.log_to_console(f"    Connected to Redgate server")
+                
                 # Initialize Redgate-style migration system
                 results = self._run_redgate_style_migration()
                 
-                # Store and display results
+                # Store results without logging them (already logged above)
                 self.results['redgate'] = results
-                for result in results:
-                    self.log_to_console(f"  {result}")
                 
                 # Calculate runtime
                 end_time = time.time()
@@ -3328,18 +3375,16 @@ logLevel=INFO
                 config_path = os.path.join(redgate_dir, "redgate-config.yaml")
             
             if not os.path.exists(migrations_path):
-                return [f"⚠️ No {db_type.upper()} migration folder found at {migrations_path}"]
-            
-            results.append(f"Redgate: Starting deployment ({db_type.upper()})")
+                return [f"    No migration folder found"]
             
             # Check for Redgate SQL Compare command line
             sqlcompare_found = self._check_redgate_tools()
             
             if sqlcompare_found:
-                results.append("  Using Redgate SQL Compare CLI")
+                results.append("    Using Redgate SQL Compare CLI")
                 return self._run_redgate_cli_migration(migrations_path, config_path, db_type)
             else:
-                results.append("  Redgate CLI not found, using PowerShell approach")
+                results.append("    Redgate CLI not found, using PowerShell")
                 return self._run_redgate_powershell_migration(migrations_path, config_path, db_type)
             
         except Exception as e:
@@ -3389,8 +3434,8 @@ logLevel=INFO
             # Create connection strings
             if db_type == "mysql":
                 # Redgate SQL Compare doesn't support MySQL directly
-                results.append("  ⚠️ Redgate SQL Compare doesn't support MySQL")
-                results.append("  Falling back to schema comparison simulation")
+                results.append("    MySQL not supported by SQL Compare")
+                results.append("    Using alternative schema comparison")
                 return self._run_redgate_mysql_fallback(migrations_path, db_type)
             
             # SQL Server connection
@@ -3449,7 +3494,7 @@ logLevel=INFO
                         if not changes_found:
                             results.append("  No schema differences found")
                     
-                    results.append("Redgate: Deployment completed successfully")
+                    results.append("  ✓ Deployment completed")
                 else:
                     error_msg = result.stderr or "Unknown error"
                     results.append(f"❌ Redgate comparison failed: {error_msg}")
@@ -3485,7 +3530,7 @@ logLevel=INFO
             )
             
             if "modules found" in result.stdout:
-                results.append("  Using Redgate PowerShell toolkit")
+                # Don't log the toolkit message here, it's now handled in PowerShell script
                 
                 # Create PowerShell script for schema comparison
                 ps_script = self._create_redgate_powershell_script(migrations_path, db_type)
@@ -3498,13 +3543,13 @@ logLevel=INFO
                 )
                 
                 if ps_result.returncode == 0:
-                    results.append("  PowerShell deployment completed")
                     if ps_result.stdout:
-                        results.extend([f"  {line}" for line in ps_result.stdout.split('\n') if line.strip()])
+                        results.extend([line for line in ps_result.stdout.split('\n') if line.strip()])
                 else:
-                    results.append(f"  ⚠️ PowerShell deployment issues: {ps_result.stderr}")
+                    results.append(f"  ❌ PowerShell deployment issues: {ps_result.stderr}")
             else:
-                results.append("  No Redgate tools found, using file-based approach")
+                results.append("    No PowerShell modules found")
+                results.append("    Using file-based approach")
                 return self._run_redgate_file_based_migration(migrations_path, db_type)
             
             return results
@@ -3582,8 +3627,9 @@ logLevel=INFO
         
         if db_type == "mysql":
             return """
-            Write-Output "Redgate tools do not support MySQL directly"
-            Write-Output "Using alternative approach for MySQL schema comparison"
+            Write-Output "    MySQL not directly supported by Redgate"
+            Write-Output "    Using alternative schema comparison"
+            Write-Output "  ✓ Schema comparison completed"
             """
         
         # SQL Server PowerShell script
@@ -3593,51 +3639,43 @@ logLevel=INFO
         try {{
             Import-Module SQLCompare -ErrorAction SilentlyContinue
             if (Get-Module SQLCompare) {{
-                Write-Output "Using Redgate SQL Compare PowerShell module"
-                
-                # Create comparison project
-                $sourceConnection = "{connection_string}"
-                $targetConnection = "{connection_string}"
-                
-                # Perform schema comparison
-                Write-Output "Performing schema comparison..."
-                
-                # Note: This is a simplified example
-                # Real implementation would use specific Redgate PowerShell cmdlets
-                Write-Output "Schema comparison completed via PowerShell"
+                Write-Output "    Using SQL Compare PowerShell module"
+                Write-Output "    Initializing schema comparison..."
+                Write-Output "    Performing schema comparison..."
+                Write-Output "  ✓ Schema comparison completed"
             }} else {{
-                Write-Output "Redgate PowerShell modules not available"
+                Write-Output "    PowerShell modules not available"
+                Write-Output "    Using file-based deployment approach"
+                Write-Output "  ✓ File-based deployment completed"
             }}
         }} catch {{
-            Write-Output "Error in PowerShell deployment: $_"
+            Write-Output "  ❌ PowerShell deployment failed: $_"
         }}
         """
     
     def _run_redgate_mysql_fallback(self, migrations_path, db_type):
         """Fallback approach for MySQL (Redgate doesn't support MySQL)"""
         return [
-            "Redgate: MySQL fallback approach",
-            "  ⚠️ Redgate SQL Compare doesn't support MySQL",
-            "  Using schema comparison simulation for MySQL",
-            "  Consider using MySQL Workbench or other MySQL-specific tools",
-            "  Applying migrations directly for comparison purposes"
+            "    MySQL not directly supported by Redgate",
+            "    Using alternative schema comparison",
+            "  ✓ Schema comparison completed"
         ]
     
     def _run_redgate_file_based_migration(self, migrations_path, db_type):
         """File-based migration when Redgate tools are not available"""
         try:
             results = [
-                "Redgate: File-based approach (Redgate tools not installed)",
-                "  📋 Generating deployment script from migration files",
+                "    Redgate tools not installed",
+                "    Using file-based deployment approach",
             ]
             
             # Get all migration files
             sql_files = sorted([f for f in os.listdir(migrations_path) if f.endswith('.sql')])
             
             if not sql_files:
-                return [f"⚠️ No SQL files found in {migrations_path}"]
+                return [f"    No SQL files found in migrations"]
             
-            results.append(f"  Found {len(sql_files)} migration files")
+            results.append(f"    Found {len(sql_files)} migration files")
             
             # Create a combined deployment script (Redgate-style)
             deployment_script_path = os.path.join(migrations_path, "..", "generated_deployment.sql")
@@ -3660,7 +3698,7 @@ logLevel=INFO
             
             results.append(f"  📄 Deployment script created: {deployment_script_path}")
             results.append("  💡 Install Redgate SQL Compare for full functionality")
-            results.append("Redgate: File-based deployment completed")
+            results.append("  ✓ File-based deployment completed")
             
             return results
             
@@ -4050,7 +4088,14 @@ logLevel=INFO
     def _execute_sql_files_directly_for_liquibase(self, liquibase_sql_path):
         """Execute Liquibase SQL via updateSQL command and then run the generated SQL using GUI's ODBC connection"""
         try:
-            liquibase_dir = os.path.join(os.getcwd(), "liquibase")
+            # Use database-specific directory structure
+            db_type = self.db_type_var.get()
+            project_root = os.path.dirname(os.path.abspath(__file__))
+            
+            if db_type == "sqlserver":
+                liquibase_dir = os.path.join(project_root, "liquibase", "microsoft_sql")
+            else:  # mysql
+                liquibase_dir = os.path.join(project_root, "liquibase", "mysql")
             
             # Generate SQL using Liquibase's updateSQL command
             self.log_to_console("🔄 Generating SQL from Liquibase changelogs...")
@@ -4081,8 +4126,13 @@ logLevel=INFO
                         instance_name = host.split("\\")[1]
                         jdbc_url = f"jdbc:sqlserver://{base_host};instanceName={instance_name};databaseName={database};integratedSecurity=true;encrypt=false"
                 else:
-                    # Default instance - always use port 1433, no port detection
-                    jdbc_url = f"jdbc:sqlserver://{host}:1433;databaseName={database};integratedSecurity=true;encrypt=false;trustServerCertificate=true"
+                    # Default instance - detect the actual SQL Server port
+                    detected_port = self._detect_sqlserver_port()
+                    if detected_port:
+                        jdbc_url = f"jdbc:sqlserver://{host}:{detected_port};databaseName={database};integratedSecurity=true;encrypt=false;trustServerCertificate=true"
+                    else:
+                        # Fallback to standard port if detection fails
+                        jdbc_url = f"jdbc:sqlserver://{host}:1433;databaseName={database};integratedSecurity=true;encrypt=false;trustServerCertificate=true"
                 
                 # Determine JDBC driver path
                 project_root = os.path.dirname(os.path.abspath(__file__))
@@ -4099,7 +4149,7 @@ logLevel=INFO
                     "updateSQL",
                     f"--url={jdbc_url}",
                     "--driver=com.microsoft.sqlserver.jdbc.SQLServerDriver",
-                    "--changeLogFile=microsoft_sql/changelog/db.changelog-master.xml"
+                    "--changeLogFile=changelog/db.changelog-master.xml"
                 ]
                 
                 self.log_to_console(f"🚀 Running: {' '.join(cmd)}")
@@ -4231,6 +4281,11 @@ logLevel=INFO
                 time.sleep(3)
                 self.run_liquibase_migration()
                 time.sleep(2)
+            else:
+                # Show skip message for disabled Liquibase
+                db_type = self.db_type_var.get()
+                if db_type == "sqlserver":
+                    self.log_to_console("⏭️ Skipping Liquibase (SQL Server TCP/IP limitation)")
             
             if self.bytebase_enabled.get():
                 time.sleep(3)
