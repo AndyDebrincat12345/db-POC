@@ -23,7 +23,7 @@ import requests
 class BytebaseAPI:
     """Bytebase API integration for the POC"""
     
-    def __init__(self, base_url="http://localhost:8081", username="admin", password="admin"):
+    def __init__(self, base_url="http://localhost:8080", username="admin", password="admin"):
         self.base_url = base_url
         self.username = username
         self.password = password
@@ -47,7 +47,7 @@ class BytebaseAPI:
                     raise Exception(f"Bytebase server returned status {response.status_code}")
                     
             except requests.ConnectionError:
-                raise Exception("Cannot connect to Bytebase - make sure Docker container is running")
+                raise Exception("Cannot connect to Bytebase server at localhost:8080")
             except requests.Timeout:
                 raise Exception("Bytebase connection timeout - server may be starting up")
                 
@@ -366,7 +366,7 @@ class ProfessionalMigrationGUI:
             "🔵 Bytebase Enterprise", 
             "#3498db",
             self.run_bytebase_migration,
-            lambda: self.open_web_page('http://localhost:8081', 'Bytebase')
+            lambda: self.open_web_page('http://localhost:8080', 'Bytebase')
         )
         
         self.liquibase_button = self.create_migration_card(
@@ -2704,7 +2704,7 @@ logLevel=INFO
             # Check if Bytebase server is running
             import requests
             try:
-                response = requests.get('http://localhost:8081/api/v1/instances', timeout=5)
+                response = requests.get('http://localhost:8080/api/v1/instances', timeout=5)
                 if response.status_code == 200:
                     results.append("  Connected to Bytebase server")
                     
@@ -2719,7 +2719,7 @@ logLevel=INFO
                     results.append("  ⚠️ Bytebase server not responding properly")
                     
             except requests.RequestException:
-                results.append("  ⚠️ Cannot connect to Bytebase server at localhost:8081")
+                results.append("    ⚠️ Cannot connect to Bytebase server at localhost:8080")
                 results.append("  Please ensure Bytebase is running or install Bytebase CLI")
             
             return results
