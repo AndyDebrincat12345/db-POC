@@ -3,7 +3,7 @@
   "host": "localhost",
   "port": "1433",
   "database": "MigrationPOC",
-  "username": "root",
+  "username": "sa",
   "password": "eyroot",
   "trusted_connection": true
 }
