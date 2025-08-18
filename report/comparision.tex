@@ -74,52 +74,72 @@ Works like a database version of GitHub, great for teams who want visual collabo
     \item Free for up to 20 users and 5 databases
 \end{itemize}
 
-\textbf{Setup:}\\
+\textbf{Setup:}
+
 To set up Bytebase, you need to have Docker installed and running on your machine.
 Once Docker is ready, you can pull the Bytebase Docker image and start the container.
 The web interface will be accessible through your browser at the specified port.
 Bytebase code works using a simple folder structure with SQL migration files and a single YAML configuration file (bytebase-config.yaml) to manage database changes.
-The tool then provides a web service accessible through your browser, from which you can manage your database migrations.
+The tool then provides a web service accessible through your browser, from which you can manage your database migrations.\\
 
-\textbf{Testing Outcomes:}\\
+\textbf{Testing Outcomes:}
+
 The added dependency on Docker means that if Docker isn't running, Bytebase can't function.
 This was the main hurdle faced during testing and was an additional learning that had to be tackled.
 Bytebase then showed its potential by providing a robust migration tracking system and an intuitive web interface for managing database changes.
 The login process when debugging was tedious as it would constantly prompt for a new admin login and reusing email addresses was not possible.
 Bytebase effectively managed redundant migrations and provided clear visibility into the migration history.
-That is processing time for migrations where no changes were made was minimal, showcasing Bytebase's efficiency.
+That is processing time for migrations where no changes were made was minimal, showcasing Bytebase's efficiency.\\
 
-\textbf{Overview:}\\
+\textbf{Overview:}
+
 Bytebase code was simple to learn and interface seems great for teams, the free version is limited for larger projects.
 Migration tracking is excellent, and the web interface is intuitive.
-Version control is not as robust as traditional Git-based systems, which may be a drawback for some teams.hat values simplicity, are comfortable with Docker containers, and don't mind the additional infrastructure setup requirements.
+Version control is not as robust as traditional Git-based systems, which may be a drawback for some teams.hat values simplicity, are comfortable with Docker containers, and don't mind the additional infrastructure setup requirements.\\
 
 \section{Liquibase}
 
-Command-line tool that's been around for years. Uses text files to track database changes - popular with developers who like automation.
+Command-line tool that's been around for years. Uses text files to track database changes, known to be used in automation.
 
 \textbf{What it does well:}
 \begin{itemize}
     \item Supports 40+ database types
     \item Works with any CI/CD pipeline
     \item Completely free with no user limits
-    \item Very flexible - uses XML, YAML, or SQL files
+    \item Flexibility in changelog code formats
 \end{itemize}
 
-\textbf{Setup:} Liquibase supports three changelog formats: XML, YAML, and SQL files. You can choose any format based on your team's preference. We used XML files for our migrations because they provide better structure validation and error checking compared to plain SQL. The tool uses a master changelog file that references all individual migration files, with configuration managed through a liquibase.properties file. Unlike the other tools, Liquibase can be fully accessed and used directly from code/command line without requiring separate applications. Our implementation required manually downloading the correct database libraries (JDBC drivers) and adjusting existing ones to work with our Python virtual environment. This was a very tedious process, especially getting Liquibase to properly identify file paths. The tool is heavily dependent on where you run commands from. Path configurations in the properties file and relative references in XML files must be precisely aligned, making it fragile when running from different directories.
+\textbf{Setup:}
 
-\textbf{Testing Results:} Worked with MySQL successfully and showed consistent performance in automated testing (3-4 second execution times). Could not connect to SQL Server due to TCP/IP network restrictions, requiring the automated system to skip Liquibase for SQL Server migrations entirely. When it worked, Liquibase demonstrated reliable execution with proper status reporting ("Database schema is up to date", "No new changesets to execute"). All operations generate detailed log files, making it excellent for debugging and audit trails. This file-based logging is particularly useful for automated environments and troubleshooting.
+Liquibase supports three changelog formats: XML, YAML, and SQL files.
+XML files were used for our migrations because they provide better structure validation and error checking compared to plain SQL.
+The tool uses a master changelog file that references all individual migration files, with configuration managed through a liquibase.properties file. 
+Unlike the other tools, Liquibase can be fully accessed and used directly from code/command line without requiring separate applications.
+This implementation required manually downloading the correct database libraries (JDBC drivers) and adjusting existing ones to work with our Python virtual environment.
+This was a very tedious process, especially getting Liquibase to properly identify file paths.
+The tool is heavily dependent on where you run commands from.
+Path configurations in the properties file and relative references in XML files must be precisely aligned, making it fragile when running from different directories.\\
 
-\textbf{Overview:}\\
-\textit{Pros:} Supports the most databases, totally free, great for automation, very mature tool, powerful once configured, fully code-integrated (no separate apps needed), excellent file-based logging for debugging.
+\textbf{Testing Results:}
 
-\textit{Cons:} Harder to learn, no web interface, may need network setup in corporate environments, tedious setup process, heavily path-dependent, requires manual library management.
+Worked with MySQL successfully and showed consistent performance in automated testing (3-4 second execution times).
+Could not connect to Microsoft SQL Server due to a TCP/IP network requirement restricted by corporate policy. 
+Causing the automated system to skip Liquibase for SQL Server migrations entirely.
+When it worked, Liquibase demonstrated reliable execution with proper status reporting ("Database schema is up to date", "No new changesets to execute").
+All operations generate detailed log files, making it excellent for debugging and audit trails.
+This file-based logging is particularly useful for automated environments and troubleshooting.\\
 
-\textit{Choose this if:} You need maximum database support, prefer command-line tools, have complex automation needs, and don't mind spending significant time on initial setup and configuration.
+\textbf{Overview:}
+
+Liquibase was firstly free and open-source, but has since introduced paid plans with additional features.
+Out of the box it is complex to learn but powerful for automation on various database platforms.
+Integration is fully with code and CI/CD pipelines so it can be easily incorporated into existing workflows.
+There is no web interface, which may be a drawback for teams that prefer visual tools.
+It should be chosen if you need maximum database support and command-line integration is needed.\\
 
 \section{Redgate}
 
-Visual tools focused on SQL Server. Think of it as the "Microsoft Office" of database tools - polished and feature-rich.
+Application based tool that provides visual tools focused on SQL Server.
 
 \textbf{What it does well:}
 \begin{itemize}
@@ -129,16 +149,23 @@ Visual tools focused on SQL Server. Think of it as the "Microsoft Office" of dat
     \item Professional-grade features
 \end{itemize}
 
-\textbf{Setup:} Unlike Bytebase's web interface or Liquibase's command-line approach, Redgate requires downloading and installing a separate Windows desktop application - you can't just pip install it or use it directly in VS Code. The "visual" part means it shows database schemas side-by-side in a graphical interface where you can see differences highlighted in colors, click to navigate between objects, and use drag-and-drop to synchronize changes. It's a standalone desktop application, not integrated with your development environment. Must download and install the desktop application from Redgate's website. Cannot be installed via pip or used directly within VS Code like Python packages.
+\textbf{Setup:}
 
-\textbf{Testing Results:} Connected successfully to SQL Server and showed consistently fast execution times in automated testing (0.6 seconds for SQL Server, 0.5-0.7 seconds for MySQL). Demonstrated reliable connectivity and quick processing through PowerShell integration across both database platforms.
+Unlike Bytebase's web interface or Liquibase's command-line approach, Redgate requires downloading and installing a separate Windows desktop application.
+The "visual" part means it shows database schemas side-by-side in a graphical interface where you can see differences highlighted in colors, click to navigate between objects, and use drag-and-drop to synchronize changes.
+It's a standalone desktop application, not integrated with your development environment.
+Must download and install the desktop application from Redgate's website.
+Cannot be installed via pip or used directly within VS Code like Python packages.
+The code initially attempted was a simulation of the visual interface, simply using SQL queries to compare schemas and generate migration scripts.\\
 
-\textbf{Overview:}\\
-\textit{Pros:} Best-in-class for SQL Server, intuitive desktop interface with visual comparisons, professional support, reliable connectivity.
+\textbf{Testing Results:}
 
-\textit{Cons:} Expensive for full features, mainly SQL Server only, very limited free version (mainly just schema comparison for single users), requires Windows desktop installation (not web-based).
+Connected successfully to SQL Server and showed consistently fast execution times in automated testing (0.6 seconds for SQL Server, 0.5-0.7 seconds for MySQL).
+Demonstrated reliable connectivity and quick processing through PowerShell integration across both database platforms.\\
 
-\textit{Choose this if:} You primarily use SQL Server, prefer desktop applications over web interfaces, need visual schema comparison tools, or have budget for premium software.
+\textbf{Overview:}
+This tool offers best-in-class support for SQL Server with an intuitive desktop interface, visual comparisons, and professional support, but it’s costly for full features, limited to SQL Server, and only available as a Windows desktop app.
+Choose it if you work primarily with SQL Server, prefer desktop tools, and have the budget for premium software.
 
 \newpage
 \section{Detailed Comparison}
