@@ -1,0 +1,239 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{tabularx}
+\usepackage{amssymb}
+
+\title{Database Migration Tools Comparison: \\
+Bytebase vs Liquibase vs Redgate}
+\author{Database Migration Analysis}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+\newpage
+
+\section{Executive Summary}
+
+This document provides a comprehensive comparison of three leading database migration and schema management tools: Bytebase, Liquibase, and Redgate. Each tool offers distinct approaches to database versioning, migration management, and team collaboration, catering to different organizational needs and technical requirements.
+
+\section{Introduction}
+
+This report compares three database migration tools based on real testing with Microsoft SQL Server and MySQL.
+This focuses on the freely available versions since the intership engagement was not able to explore paid features.
+
+\textbf{What we tested:}
+\begin{itemize}
+    \item All tools used the same SQL migration scripts
+    \item Tested connections to both SQL Server and MySQL
+    \item Evaluated free/community editions only
+\end{itemize}
+
+\textbf{Tools compared:}
+\begin{itemize}
+    \item \href{https://bytebase.com}{\textbf{Bytebase Community}}
+    \item \href{https://liquibase.org}{\textbf{Liquibase Open Source}}
+    \item \href{https://www.red-gate.com/products/sql-development/sql-compare/}{\textbf{Redgate Free Edition}}
+\end{itemize}
+
+\newpage
+\section{Tool Overview}
+
+\subsection{Bytebase}
+
+Modern web-based tool with a clean interface. Works like a database version of GitHub - great for teams who want visual collaboration.
+
+\textbf{What it does well:}
+\begin{itemize}
+    \item Easy-to-use web interface
+    \item Connects to multiple database types
+    \item Tracks who changed what and when
+    \item Free for up to 20 users and 5 databases
+\end{itemize}
+
+\textbf{How it works:} Bytebase uses a simple folder structure with SQL migration files and a single YAML configuration file (bytebase-config.yaml) to manage database changes. The tool runs as a web service that you access through your browser.
+
+\textbf{Testing results:} Connected successfully to both SQL Server and MySQL, but our integration required Flask setup for proper functionality. Connection to the host page was not always successful and sometimes required multiple attempts or restarts.
+
+\textbf{Pros:} Simple to learn, great for small teams, modern interface, good free version, clean folder organization.
+
+\textbf{Cons:} Newer tool with smaller community, limited advanced features in free version, requires Flask setup, occasional connection reliability issues.
+
+\textbf{Choose this if:} You want something easy to use, work with multiple databases, have a small team that values simplicity, and don't mind the additional Flask setup requirements.
+
+\subsection{Liquibase}
+
+Command-line tool that's been around for years. Uses text files to track database changes - popular with developers who like automation.
+
+\textbf{What it does well:}
+\begin{itemize}
+    \item Supports 40+ database types
+    \item Works with any CI/CD pipeline
+    \item Completely free with no user limits
+    \item Very flexible - uses XML, YAML, or SQL files
+\end{itemize}
+
+\textbf{How it works:} Liquibase supports three changelog formats: XML, YAML, and SQL files. You can choose any format based on your team's preference. We used XML files for our migrations because they provide better structure validation and error checking compared to plain SQL. The tool uses a master changelog file that references all individual migration files, with configuration managed through a liquibase.properties file.
+
+\textbf{Setup complexity:} Our implementation required manually downloading the correct database libraries (JDBC drivers) and adjusting existing ones to work with our Python virtual environment. This was a very tedious process, especially getting Liquibase to properly identify file paths.
+
+\textbf{Path dependency issues:} The tool is heavily dependent on where you run commands from. Path configurations in the properties file and relative references in XML files must be precisely aligned, making it fragile when running from different directories.
+
+\textbf{Testing results:} Worked with MySQL but couldn't connect to SQL Server due to network restrictions.
+
+\textbf{Connection issue:} Had TCP/IP problems with SQL Server in our corporate environment. This might happen in other enterprise networks too.
+
+\textbf{Pros:} Supports the most databases, totally free, great for automation, very mature tool, powerful once configured.
+
+\textbf{Cons:} Harder to learn, no web interface, may need network setup in corporate environments, tedious setup process, heavily path-dependent, requires manual library management.
+
+\textbf{Choose this if:} You need maximum database support, prefer command-line tools, have complex automation needs, and don't mind spending significant time on initial setup and configuration.
+
+\subsection{Redgate}
+
+Visual tools focused on SQL Server. Think of it as the "Microsoft Office" of database tools - polished and feature-rich.
+
+\textbf{What it does well:}
+\begin{itemize}
+    \item Excellent visual comparison tools
+    \item Built specifically for SQL Server
+    \item Easy drag-and-drop interface
+    \item Professional-grade features
+\end{itemize}
+
+\textbf{How the visual interface works:} Unlike Bytebase's web interface, Redgate uses desktop applications (Windows software) that you install locally. The "visual" part means it shows database schemas side-by-side in a graphical interface where you can see differences highlighted in colors, click to navigate between objects, and use drag-and-drop to synchronize changes. It's not web-based like Bytebase - it's more like traditional Windows software with visual comparison windows.
+
+\textbf{Testing results:} Connected successfully to SQL Server.
+
+\textbf{Free version limits:} Very basic compared to other tools - mainly just schema comparison for single users. The visual interface is available but with limited functionality.
+
+\textbf{Pros:} Best-in-class for SQL Server, intuitive desktop interface with visual comparisons, professional support, reliable connectivity.
+
+\textbf{Cons:} Expensive for full features, mainly SQL Server only, very limited free version, requires Windows desktop installation (not web-based).
+
+\textbf{Choose this if:} You primarily use SQL Server, prefer desktop applications over web interfaces, need visual schema comparison tools, or have budget for premium software.
+
+\newpage
+\section{Detailed Comparison}
+
+\subsection{Licensing and Cost (Free Versions Focus)}
+
+\begin{table}[h!]
+\centering
+\begin{tabularx}{\textwidth}{|X|X|X|X|}
+\hline
+\textbf{Aspect} & \textbf{Bytebase Community} & \textbf{Liquibase Open Source} & \textbf{Redgate Free Tools} \\
+\hline
+License Type & Free Community Edition & Open Source (Apache 2.0) & Limited Free Edition \\
+\hline
+User Limitations & Up to 20 users & Unlimited & Single user \\
+\hline
+Database Instances & Up to 5 instances & Unlimited & Limited \\
+\hline
+Enterprise Features & Limited RBAC, Basic audit & None & Very limited \\
+\hline
+Support & Community only & Community only & Limited \\
+\hline
+Upgrade Path & Seamless to Enterprise & Liquibase Pro available & Full Redgate suite \\
+\hline
+\end{tabularx}
+\caption{Free Version Licensing Comparison}
+\end{table}
+
+\subsection{Database Support}
+
+\begin{table}[h!]
+\centering
+\begin{tabularx}{\textwidth}{|X|X|X|X|}
+\hline
+\textbf{Database} & \textbf{Bytebase} & \textbf{Liquibase} & \textbf{Redgate} \\
+\hline
+PostgreSQL & \checkmark & \checkmark & Limited \\
+\hline
+MySQL & \checkmark & \checkmark & Limited \\
+\hline
+SQL Server & \checkmark & \checkmark & \checkmark (Primary) \\
+\hline
+Oracle & \checkmark & \checkmark & Limited \\
+\hline
+MongoDB & \checkmark & \checkmark & No \\
+\hline
+SQLite & \checkmark & \checkmark & No \\
+\hline
+Total Supported & 15+ & 40+ & 10+ \\
+\hline
+\end{tabularx}
+\caption{Database Platform Support}
+\end{table}
+
+\subsection{Feature Comparison}
+
+\begin{longtable}{|p{3cm}|p{3cm}|p{3cm}|p{3cm}|}
+\hline
+\textbf{Feature} & \textbf{Bytebase} & \textbf{Liquibase} & \textbf{Redgate} \\
+\hline
+\endfirsthead
+
+\hline
+\textbf{Feature} & \textbf{Bytebase} & \textbf{Liquibase} & \textbf{Redgate} \\
+\hline
+\endhead
+
+Web Interface & \checkmark & Limited & \checkmark \\
+\hline
+Command Line & \checkmark & \checkmark & \checkmark \\
+\hline
+Version Control & Git Integration & File-based & Git/TFS Integration \\
+\hline
+Rollback & \checkmark & \checkmark & \checkmark \\
+\hline
+Schema Drift & \checkmark & Limited & \checkmark \\
+\hline
+Data Migration & \checkmark & \checkmark & \checkmark \\
+\hline
+Multi-environment & \checkmark & \checkmark & \checkmark \\
+\hline
+RBAC & \checkmark & Enterprise only & \checkmark \\
+\hline
+API Access & \checkmark & \checkmark & Limited \\
+\hline
+Audit Trail & \checkmark & Basic & \checkmark \\
+\hline
+\caption{Feature Comparison Matrix}
+\end{longtable}
+
+\newpage
+\section{Conclusion}
+
+\textbf{Quick Summary:}
+
+\begin{itemize}
+    \item \textbf{Bytebase} - Best for teams who want something modern and easy to use
+    \item \textbf{Liquibase} - Best for developers who need maximum database support and automation
+    \item \textbf{Redgate} - Best for SQL Server shops with budget for premium tools
+\end{itemize}
+
+\textbf{What to consider:} For simple migrations, all three work fine. For complex stuff, Liquibase and Redgate have more features. Small teams should try Bytebase first - it's the easiest to learn. Large companies might prefer Liquibase for its flexibility or Redgate for SQL Server environments. Remember that Liquibase might need extra network setup in corporate environments.
+
+\textbf{Bottom line:} Pick based on your database type, team size, and how much complexity you need. Start with the free versions to see what works for your team.
+
+\newpage
+\section{References}
+
+\begin{itemize}
+    \item Bytebase Official Documentation: \url{https://bytebase.com/docs}
+    \item Liquibase Documentation: \url{https://docs.liquibase.com}
+    \item Redgate Documentation: \url{https://documentation.red-gate.com}
+\end{itemize}
+
+\end{document}
