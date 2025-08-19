@@ -38,7 +38,7 @@
 
 \section{Executive Summary}
 
-This document provides a comprehensive comparison of three leading database migration and schema management tools: Bytebase, Liquibase, and Redgate.
+This document provides a comparison of three leading database migration and schema management tools: Bytebase, Liquibase, and Redgate.
 Each tool offers distinct approaches to database versioning, migration management, and team collaboration, catering to different organizational needs and technical requirements.
 
 \section{Introduction}
@@ -64,7 +64,7 @@ The testing was conducted using Microsoft SQL Server and MySQL databases, focusi
 Modern web-based tool with a clean interface.
 Works like a database version of GitHub, great for teams who want visual collaboration.
 
-\textbf{What it does well:}
+
 \begin{itemize}
     \item Easy-to-use web interface
     \item Connects to multiple database types
@@ -78,7 +78,7 @@ Works like a database version of GitHub, great for teams who want visual collabo
 To set up Bytebase, you need to have Docker installed and running on your machine.
 Once Docker is ready, you can pull the Bytebase Docker image and start the container.
 The web interface will be accessible through your browser at the specified port.
-Bytebase code works using a simple folder structure with SQL migration files and a single YAML configuration file (bytebase-config.yaml) to manage database changes.
+Bytebase code works using a simple folder structure with SQL migration files and a single YAML configuration file \texttt{bytebase-config.yaml} to manage database changes.
 The tool then provides a web service accessible through your browser, from which you can manage your database migrations.\\
 
 \textbf{Testing Outcomes:}
@@ -101,7 +101,6 @@ Version control is not as robust as traditional Git-based systems, which may be 
 
 Command-line tool that's been around for years. Uses text files to track database changes, known to be used in automation.
 
-\textbf{What it does well:}
 \begin{itemize}
     \item Supports 40+ database types
     \item Works with any CI/CD pipeline
@@ -142,7 +141,6 @@ It should be chosen if you need maximum database support and command-line integr
 
 Application based tool that provides visual tools focused on SQL Server.
 
-\textbf{What it does well:}
 \begin{itemize}
     \item Excellent visual comparison tools
     \item Built specifically for SQL Server
@@ -267,5 +265,16 @@ Audit Trail & \checkmark & Basic & \checkmark \\
     \item \textbf{Liquibase} - Best for developers who need maximum database support and automation.
     \item \textbf{Redgate} - Best for SQL Server environments with budget for premium tools. With the want to use visual application features (Microsoft Software Style).
 \end{itemize}
+
+The testing conducted was not exhaustive.
+A consistent set of migrations and database commands was used across all tools for comparison.
+However, varying database configurations and workloads were not considered.
+These factors may significantly affect performance and usability in real-world scenarios.
+
+Some tool features have not been fully explored or evaluated.
+For example, user-level interactions with Bytebase were not tested, as co-workers were unavailable to assist.
+
+This report serves as a baseline overview of available features and highlights areas that may warrant further investigation.
+The full scope of testing was limited due to time constraints and competing deadlines.
 
 \end{document}
